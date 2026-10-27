@@ -23,8 +23,8 @@ import generar_escala as base  # noqa: E402
 AZUL = "15324B"
 VERDE = "16866B"
 DORADO = "E6B85C"
-FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FUENTE_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FUENTE = base.FUENTE
+FUENTE_B = base.FUENTE_B
 
 st.set_page_config(page_title="Escala salarial | Capital Humano", page_icon="📊", layout="wide")
 
