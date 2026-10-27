@@ -1,3 +1,5 @@
 xlrd==2.0.1
 openpyxl>=3.1
 fpdf2>=2.7
+pandas>=2.0
+streamlit>=1.35
