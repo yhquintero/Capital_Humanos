@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -423,8 +424,29 @@ def escribir_excel(filas, contadores, registros, anomalias):
 # ---------------------------------------------------------------------------
 # 5. PDF (A4 horizontal)
 # ---------------------------------------------------------------------------
-FUENTE = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-FUENTE_B = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+def _localizar_fuentes_pdf():
+    """Busca fuentes Unicode instaladas en Linux, Windows o macOS."""
+    windows = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+    parejas = [
+        (Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")),
+        (Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
+         Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf")),
+        (windows / "arial.ttf", windows / "arialbd.ttf"),
+        (windows / "calibri.ttf", windows / "calibrib.ttf"),
+        (Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+         Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf")),
+    ]
+    for normal, negrita in parejas:
+        if normal.is_file() and negrita.is_file():
+            return str(normal), str(negrita)
+    raise FileNotFoundError(
+        "No se encontró una fuente Unicode compatible con PDF. "
+        "Instala Arial (Windows) o DejaVu Sans (Linux/macOS)."
+    )
+
+
+FUENTE, FUENTE_B = _localizar_fuentes_pdf()
 
 
 class EscalaPDF(FPDF):

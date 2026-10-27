@@ -8,43 +8,90 @@ Herramienta Python para recalcular la escala salarial y preparar una propuesta i
 - Aplicación del factor por cargo a cada salario extraído de la plantilla.
 - Validación estricta por fila: `salario ajustado ≤ salario original × 6`.
 - Mínimo del grupo I fijado en **$3,210.00 CUP** (Res. 14/2026).
-- Grupos con propuesta de plantilla recalculados; grupos sin propuesta conservan la escala oficial Res. 15/2026 (44 h).
-- Exportación del cálculo actualizado a **Excel `.xlsx`** (escala y detalle) y **PDF multipágina A4 horizontal**, listo para imprimir.
+- Grupos con propuesta recalculados; los demás conservan la escala oficial Res. 15/2026 (44 h).
+- Exportación a **Excel `.xlsx`** y **PDF A4 horizontal** listo para imprimir.
 - Trazabilidad por hoja y fila de origen del libro `.xls`.
 
-## Instalación y ejecución
+## Windows PowerShell · instalación recomendada
 
-Desde la raíz del repositorio:
+**Requisito: Python 3.10 o posterior, de 64 bits.** Streamlit usa PyArrow y PyArrow no tiene paquetes binarios para Python de 32 bits en Windows. El error `RuntimeError: Not supported on 32-bit Windows` significa que el intérprete usado creó un entorno virtual de 32 bits; actualizar `pip` no lo corrige.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
-python -m pip install -r "TES/Salariales/Nueva Escala 3210/requirements.txt"
-streamlit run "TES/Salariales/Nueva Escala 3210/app_escala.py" --server.address 0.0.0.0
+En PowerShell, pon entre comillas la ruta que contiene el espacio. Por ejemplo, desde la ubicación mostrada en tu consola:
+
+```powershell
+Set-Location -LiteralPath 'D:\Proyectos\Github\Capital_Humanos\TES\Salariales\Nueva Escala 3210'
 ```
 
-La interfaz se abre normalmente en `http://localhost:8501`. Al mover el slider, la escala y el detalle de cargos se recalculan de inmediato. Usa los botones de descarga para obtener la versión actual.
+Si ya estás en la raíz del repositorio, también sirve la ruta relativa:
 
-## Salidas disponibles
-
-- `Escala_Salarial_3210_Nueva.xlsx` y `.pdf`: referencias generadas con `generar_escala.py`.
-- Descargas interactivas: llevan el multiplicador elegido en el nombre de archivo y contienen la escala completa y el detalle actualizado de plantilla.
-
-Para regenerar las salidas de referencia:
-
-```bash
-python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
+```powershell
+Set-Location -LiteralPath '.\TES\Salariales\Nueva Escala 3210'
 ```
 
-## Fuentes
+Si ya habías creado `.venv` con Python de 32 bits, elimínalo primero (esto elimina solo el entorno virtual, no los archivos de la escala):
 
-- Resolución 14/2026, GOC-2026-393-O60: salario mínimo mensual de $3,210.00.
-- Resolución 15/2026, GOC-2026-394-O60: escala oficial de 32 grupos, jornada de 44 horas.
+```powershell
+Remove-Item -LiteralPath .\.venv -Recurse -Force
+```
+
+Instala Python 3.12 de 64 bits si aún no está instalado y vuelve a abrir PowerShell:
+
+```powershell
+winget install Python.Python.3.12
+```
+
+Después ejecuta el instalador del proyecto. Este selecciona automáticamente Python x64 3.10+, actualiza pip, instala los paquetes y verifica Streamlit/PyArrow:
+
+```powershell
+.\instalar_windows.ps1
+```
+
+Si PowerShell bloquea la ejecución del script, permite scripts solo en la ventana actual:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\instalar_windows.ps1
+```
+
+El lanzador `py` puede listar los intérpretes instalados con `py -0p`. Para comprobar el entorno creado:
+
+```powershell
+.\.venv\Scripts\python.exe -c "import sys,struct; print(sys.version); print(struct.calcsize('P')*8, 'bits')"
+```
+
+Debe indicar **64 bits** y Python **3.10+**.
+
+## HTTPS local
+
+Instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta:
+
+```powershell
+.\run_https.ps1
+```
+
+La aplicación abrirá `https://localhost:8501` y usará el Python del `.venv` del proyecto. La CA local queda confiable en ese equipo. El certificado de mkcert no es un certificado público de Internet. Para uso en una LAN privada se puede ejecutar ` .\run_https.ps1 -EnRedLocal `; configura también el Firewall para la red privada y confía en la raíz de mkcert desde cada dispositivo cliente.
+
+Para obtener un certificado público validado por los navegadores y renovación automática, se necesita un dominio propio. Sigue [`docs/HTTPS.md`](../../../docs/HTTPS.md) para el despliegue Caddy + Let's Encrypt con autenticación adicional.
+
+## Linux / macOS
+
+Desde la carpeta del proyecto:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+./run_https.sh
+```
+
+## Salidas y fuentes
+
+- `Escala_Salarial_3210_Nueva.xlsx` y `.pdf`: ejemplos generados por `generar_escala.py`.
+- Las descargas de la app contienen la escala completa y los 183 cargos con el multiplicador seleccionado.
+- Res. 14/2026, GOC-2026-393-O60: salario mínimo mensual de $3,210.00.
+- Res. 15/2026, GOC-2026-394-O60: escala oficial de 32 grupos, jornada de 44 horas.
 - `Escala 3210_OK.xlsx`: escala histórica Res. 29/2020.
-- `propuesta de plantilla por la resolucion 87.xls`: registros de cargos, grupos propuestos y salarios de origen.
+- `propuesta de plantilla por la resolucion 87.xls`: cargos y salarios de origen.
 
-## Notas de cálculo
-
-El multiplicador de la interfaz se aplica a los salarios propuestos que aparecen en la plantilla de origen. Para cada registro se calcula un tope independiente de seis veces su propio salario original. Los cargos sin salario propuesto se muestran con el salario oficial de la Res. 15/2026; el mínimo del grupo I permanece anclado en $3,210.00. Por tanto, no se imputan salarios de plantilla a grupos que no aparecen en el libro fuente.
-
-La fuente presenta dos discrepancias en los importes del grupo XII y del XV. El generador de referencia adopta el valor mayoritario y deja anotadas las ocurrencias; la interfaz conserva los registros individuales para facilitar la revisión. Validar los datos antes de una decisión administrativa.
+El tope se verifica por cargo: `salario ajustado ≤ salario original × 6`. Los cargos sin salario propuesto conservan el salario oficial y el grupo I permanece anclado en $3,210.00. Dos discrepancias de origen aparecen en los grupos XII y XV; la interfaz mantiene el detalle por fila para su revisión. Validar cualquier propuesta antes de aprobarla.

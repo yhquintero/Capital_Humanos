@@ -8,6 +8,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](TES/Salariales/Nueva%20Escala%203210/README.md)
 [![Excel](https://img.shields.io/badge/Exportaci%C3%B3n-Excel%20%7C%20PDF-16866B?style=flat-square)](TES/Salariales/Nueva%20Escala%203210/)
+[![HTTPS](https://img.shields.io/badge/HTTPS-Caddy%20%2B%20Let's%20Encrypt-1C7C54?style=flat-square)](docs/HTTPS.md)
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-E6B85C?style=flat-square)](#-alcance-y-validación)
 
 **[Abrir la guía de uso](TES/Salariales/Nueva%20Escala%203210/README.md) · [Ver el Excel de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.xlsx) · [Ver el PDF de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.pdf)**
@@ -27,18 +28,36 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 
 ## 🚀 Inicio rápido
 
-Requiere Python 3.10 o posterior. Desde la raíz del repositorio:
+### Windows PowerShell
 
-```bash
-python -m venv .venv
-# Linux / macOS
-source .venv/bin/activate
-# Windows: .venv\Scripts\activate
-python -m pip install -r "TES/Salariales/Nueva Escala 3210/requirements.txt"
-streamlit run "TES/Salariales/Nueva Escala 3210/app_escala.py" --server.address 0.0.0.0
+Se requiere **Python 3.10+ de 64 bits**: Streamlit depende de PyArrow y no existen wheels de PyArrow para Windows de 32 bits. Desde la raíz del repositorio:
+
+```powershell
+Set-Location -LiteralPath '.\TES\Salariales\Nueva Escala 3210'
+# Elimina el entorno anterior solo si se creó con Python 32-bit:
+if (Test-Path .\.venv) { Remove-Item -LiteralPath .\.venv -Recurse -Force }
+.\instalar_windows.ps1
 ```
 
-Streamlit mostrará una dirección local, normalmente `http://localhost:8501`. Abre el enlace, mueve el control **Multiplicador salarial** y descarga la versión actualizada con los botones de Excel o PDF. En el diálogo de impresión también puedes elegir **Guardar como PDF**.
+El instalador selecciona un intérprete x64, actualiza `pip`, instala las dependencias y verifica PyArrow. Si informa que no hay Python x64, instala Python 3.12 con `winget install Python.Python.3.12`, abre una consola nueva y ejecuta de nuevo `.\instalar_windows.ps1`. El error `Not supported on 32-bit Windows` no se soluciona actualizando pip: hay que usar Python de 64 bits.
+
+### Linux / macOS
+
+```bash
+cd "TES/Salariales/Nueva Escala 3210"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### Abrir la aplicación por HTTPS local
+
+Instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta `run_https.ps1` en Windows o `./run_https.sh` en Linux/macOS. Se abre `https://localhost:8501`. La CA de mkcert se confía solo en los dispositivos donde se instale explícitamente; para LAN, usa la opción correspondiente y limita el Firewall a redes privadas.
+
+Para una **URL pública con certificado reconocido**, dominio propio, renovación automática TLS y autenticación adicional por contraseña, consulta [HTTPS seguro con Caddy + Let's Encrypt](docs/HTTPS.md). Se requieren DNS apuntando al servidor y puertos 80/443 disponibles. No publiques directamente el puerto 8501.
+
+El control **Multiplicador salarial** recalcula la propuesta en la interfaz; los botones generan Excel y PDF imprimibles.
 
 Para regenerar los archivos de referencia originales desde la fuente:
 
@@ -71,11 +90,14 @@ La plantilla incluye 183 registros distribuidos entre los grupos IV–XVIII. Cua
 ```text
 TES/Salariales/Nueva Escala 3210/
 ├── app_escala.py                     # interfaz web interactiva y exportadores
+├── instalar_windows.ps1              # instala dependencias sobre Python x64
+├── run_https.ps1 / run_https.sh      # certificado local mkcert
 ├── generar_escala.py                 # extracción y generador de referencia
 ├── requirements.txt                  # dependencias
-├── README.md                         # guía detallada
-├── Escala_Salarial_3210_Nueva.xlsx   # ejemplo Excel
-└── Escala_Salarial_3210_Nueva.pdf    # ejemplo PDF
+└── README.md                         # guía detallada
+Dockerfile                            # contenedor Streamlit no-root
+deploy/                               # Caddy + Let's Encrypt + acceso protegido
+docs/HTTPS.md                         # despliegue TLS y gestión segura
 ```
 
 ## 🧰 Tecnologías

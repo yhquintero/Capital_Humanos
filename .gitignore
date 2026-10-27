@@ -1,0 +1,23 @@
+# Certificados locales y claves privadas TLS: nunca se versionan
+.certs/
+certs/
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Secretos / entorno privado
+deploy/.env
+.env
+.streamlit/secrets.toml
+
+# Python y herramientas
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.streamlit/
+.DS_Store
+Thumbs.db
