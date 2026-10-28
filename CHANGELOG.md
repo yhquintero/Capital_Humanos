@@ -15,5 +15,7 @@ Cambios funcionales y de operación, organizados por versión.
 - Corregida la carga ambigua de `generar_escala`: la interfaz carga explícitamente el motor que está en su misma carpeta y falla con un mensaje claro si son versiones incompatibles.
 - Añadido un Id. correlativo antes de la hoja de origen en listados y exportaciones; los valores nulos se dejan en blanco y no se imprimen como `None`.
 - Añadido un informe A4 para revisión y aprobación humana, con método, resumen por grupo, trazabilidad completa y campos manuales de decisión/firma; se marca siempre como borrador.
+- En curso: diagnóstico auditable de calidad de plantilla con hallazgos por hoja/fila, conservando la fuente sin autocorrecciones.
+- Corregido el pie del PDF de plantilla para que no fuerce saltos de página ni se superponga al encabezado de “PLANTILLA PROPUESTA · DETALLE DE CARGOS”.
 
 > Esta sección documenta cambios en esta rama; la versión no se considera publicada hasta integrar y verificar el pull request.

@@ -14,6 +14,7 @@ Herramienta Python para recalcular la escala salarial y preparar una propuesta i
 - SHA-256 y versión de app en los informes; las descargas CSV incluyen el manifiesto JSON dentro del ZIP.
 - Validación de integridad de plantilla, escala histórica, Gaceta Oficial y módulos de cálculo.
 - Trazabilidad por hoja y fila de origen del libro `.xls`.
+- Informe de calidad en **Plantilla por cargo**: salarios ausentes/no válidos, cargos sin descripción, posibles duplicados y discrepancias por grupo con hoja/fila; exportable a CSV + manifiesto y sin correcciones automáticas.
 - Pruebas automáticas de reglas, fuentes y navegación Streamlit en GitHub Actions.
 
 ## Windows PowerShell · instalación recomendada

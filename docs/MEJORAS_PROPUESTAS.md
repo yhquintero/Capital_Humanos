@@ -19,6 +19,7 @@ Lista operativa vinculada a la hoja de ruta de [Capital Humano](ROADMAP.md). Cad
 | CH-13 | API versionada e integraciones | P3 | contrato estable con control de acceso y compatibilidad | pruebas de contrato y autorización | Pendiente |
 | CH-14 | Revisión independiente de seguridad, accesibilidad y exactitud normativa | P3 | evaluar controles ya implementados; registrar hallazgos, responsable, fecha, correcciones y límites del examen; no afirmar certificación no obtenida | evaluación externa fechada y retest de los hallazgos corregidos | Propuesta; requiere especialistas y aprobación del alcance |
 | CH-15 | Firma digital de releases e informes | P3 | Verificar firma con clave pública publicada; custodiar y rotar la clave privada fuera del repo | verificación criptográfica reproducible por una segunda persona | Pendiente; requiere gobierno de claves |
+| CH-16 | Informe de calidad de la plantilla de origen | P1 | Hallazgos de salario vacío/no válido, cargo sin descripción, posibles duplicados y discrepancias con hoja/fila; sin corregir ni eliminar datos | pruebas con fixture de incidencias y AppTest; CSV de incidencias con manifiesto | En curso; autorizada |
 
 ## Regla de aceptación
 

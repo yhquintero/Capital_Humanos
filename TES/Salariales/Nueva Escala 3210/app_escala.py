@@ -60,9 +60,9 @@ st.set_page_config(page_title="Capital Humano | Panel de Control", page_icon="�
 
 @st.cache_data(show_spinner="Leyendo la plantilla y verificando los grupos…")
 def cargar_datos():
-    propuesta, contadores, registros, anomalias = base.extraer_propuesta_plantilla()
+    propuesta, contadores, registros, anomalias, hallazgos_calidad = base.extraer_propuesta_plantilla_con_calidad()
     anterior = base.cargar_salarios_res29()
-    return propuesta, contadores, registros, anomalias, anterior
+    return propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad
 
 
 def cargar_manifiesto():
@@ -313,7 +313,21 @@ def _estilizar_hoja(
 
 
 def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    version_pie = _texto_visible(manifiesto.get("application_version"), base.VERSION_APP)
+    fecha_pie = date.today().strftime("%d/%m/%Y")
+
+    class PDFConPie(FPDF):
+        def footer(self):
+            self.set_y(-9)
+            self.set_font("DejaVu", "", 7)
+            self.set_text_color(100, 110, 118)
+            self.cell(
+                0, 5,
+                f"Capital Humano · v{version_pie} · {fecha_pie} · Página {self.page_no()} de {{nb}}",
+                align="C",
+            )
+
+    pdf = PDFConPie(orientation="L", unit="mm", format="A4")
     pdf.add_font("DejaVu", "", FUENTE)
     pdf.add_font("DejaVu", "B", FUENTE_B)
     pdf.set_auto_page_break(auto=True, margin=14)
@@ -412,12 +426,6 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
         pdf.set_font("DejaVu", "B", 8)
         pdf.multi_cell(0, 4, f"Error al verificar el manifiesto: {manifiesto['error']}")
     pdf.alias_nb_pages()
-    for n in range(1, pdf.page_no() + 1):
-        pdf.page = n
-        pdf.set_y(-9)
-        pdf.set_font("DejaVu", "", 7)
-        pdf.set_text_color(100, 110, 118)
-        pdf.cell(0, 5, f"Capital Humano · v{version} · {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
     return bytes(pdf.output())
 
 
@@ -689,7 +697,7 @@ hr{border-color:#e8eef1}
 """, unsafe_allow_html=True)
 
 try:
-    propuesta, contadores, registros, anomalias, anterior = cargar_datos()
+    propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad = cargar_datos()
 except Exception as exc:
     st.error(f"No se pudo cargar la plantilla de origen: {exc}")
     st.info("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.")
@@ -855,6 +863,37 @@ elif vista == "Comparar escenarios":
 
 elif vista == "Plantilla por cargo":
     encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
+    st.subheader("Calidad de la fuente")
+    hallazgos_df = pd.DataFrame(hallazgos_calidad)
+    conteo_hallazgos = (
+        hallazgos_df["Tipo de incidencia"].value_counts().to_dict()
+        if not hallazgos_df.empty else {}
+    )
+    q1, q2, q3, q4, q5 = st.columns(5)
+    q1.metric("Registros válidos", f"{len(registros):,}")
+    q2.metric("Salarios ausentes", int(conteo_hallazgos.get("Salario ausente", 0)))
+    q3.metric("Salarios inválidos", int(conteo_hallazgos.get("Salario inválido", 0)))
+    q4.metric("Posibles duplicados", int(conteo_hallazgos.get("Posible duplicado", 0)))
+    q5.metric("Discrepancias", int(conteo_hallazgos.get("Discrepancia salarial de grupo", 0)))
+    if hallazgos_df.empty:
+        st.success("No se detectaron incidencias en las filas con grupo válido. Esto no sustituye la revisión humana de la fuente.")
+    else:
+        st.warning(
+            f"Se detectaron {len(hallazgos_df):,} incidencias para revisar. "
+            "Este diagnóstico no corrige, elimina ni modifica filas de la fuente. "
+            "La escala consolidada mantiene la regla actual del valor mayoritario ante discrepancias."
+        )
+        st.dataframe(hallazgos_df, width="stretch", hide_index=True)
+        paquete_calidad = crear_zip_csv_con_manifiesto(
+            hallazgos_df, "Incidencias_calidad_plantilla.csv", manifiesto
+        )
+        st.download_button(
+            "Descargar incidencias + manifiesto (.zip)", paquete_calidad,
+            "Incidencias_calidad_plantilla.zip", "application/zip",
+            key="descargar_incidencias_calidad",
+        )
+    st.caption("Cada hallazgo incluye hoja y fila. Un posible duplicado coincide en hoja, grupo, cargo y salario: puede ser una plaza legítima repetida, por lo que se conserva hasta revisión humana.")
+    st.divider()
     f1, f2, f3 = st.columns([1, 1, 2])
     grupos = sorted(detalle_df["Grupo propuesto"].unique(), key=lambda g: base.ROMANO_A_ENTERO[g])
     hojas = sorted(detalle_df["Hoja de origen"].unique())

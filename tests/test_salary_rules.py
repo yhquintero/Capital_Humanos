@@ -83,6 +83,52 @@ def test_source_files_are_present_and_template_is_auditable():
     assert isinstance(anomalies, list)
 
 
+def test_source_quality_report_flags_rows_without_mutating_or_dropping_valid_duplicates(monkeypatch):
+    class FakeSheet:
+        name = "Centro de prueba"
+        rows = [
+            ["Cargo", "G.E.A", "Salario"],
+            ["Técnico de primera", "XII", 5000],
+            ["Técnico de primera", "XII", 5000],
+            ["Auxiliar de archivo", "XIII", ""],
+            ["Supervisor de turno", "XIV", -10],
+            ["Planner de mantenimiento", "XVI", "n/a"],
+            ["Operador de equipo", "XII", 4800],
+            ["", "XVII", 4000],
+        ]
+        nrows = len(rows)
+        ncols = len(rows[0])
+
+        def cell_value(self, row, column):
+            return self.rows[row][column]
+
+    class FakeWorkbook:
+        def sheets(self):
+            return [FakeSheet()]
+
+    source_rows = [list(row) for row in FakeSheet.rows]
+    monkeypatch.setattr(payroll.xlrd, "open_workbook", lambda _: FakeWorkbook())
+    monkeypatch.setattr(payroll, "RUTA_PLANTILLA", Path("plantilla_prueba.xls"))
+
+    proposal, counters, records, anomalies, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    findings_by_type = {}
+    for finding in findings:
+        findings_by_type.setdefault(finding["Tipo de incidencia"], []).append(finding)
+
+    assert proposal == {"XII": 5000.0, "XVII": 4000.0}
+    assert counters["XII"] == {5000.0: 2, 4800.0: 1}
+    assert [record["fila"] for record in records] == [2, 3, 7, 8]
+    assert "XII" in anomalies[0]
+    assert {"Salario ausente", "Salario inválido", "Cargo sin descripción", "Posible duplicado", "Discrepancia salarial de grupo"} <= set(findings_by_type)
+    assert findings_by_type["Salario ausente"][0]["Fila de origen"] == 4
+    assert [item["Fila de origen"] for item in findings_by_type["Salario inválido"]] == [5, 6]
+    assert findings_by_type["Cargo sin descripción"][0]["Fila de origen"] == 8
+    assert findings_by_type["Posible duplicado"][0]["Fila de origen"] == 3
+    assert findings_by_type["Discrepancia salarial de grupo"][0]["Fila de origen"] == 7
+    assert len(records) == 4  # El posible duplicado permanece; el diagnóstico no elimina datos.
+    assert FakeSheet.rows == source_rows
+
+
 def test_comparison_keeps_missing_groups_official_and_caps_proposed_groups():
     proposal, _, _, _ = payroll.extraer_propuesta_plantilla()
     previous = payroll.cargar_salarios_res29()
@@ -147,6 +193,21 @@ def test_approved_source_manifest_matches_all_tracked_files():
     assert all(len(source["actual_sha256"]) == 64 for source in manifest["sources"])
 
 
+def test_quality_findings_zip_contains_source_locations_and_manifest(app_namespace):
+    _, _, _, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    assert findings
+    package = app_namespace["crear_zip_csv_con_manifiesto"](
+        pd.DataFrame(findings), "incidencias.csv", payroll.verificar_manifiesto_fuentes()
+    )
+    with zipfile.ZipFile(BytesIO(package)) as archive:
+        assert set(archive.namelist()) == {"incidencias.csv", "manifiesto_fuentes.json", "LEEME.txt"}
+        csv = archive.read("incidencias.csv").decode("utf-8-sig")
+        assert "Hoja de origen,Fila de origen" in csv
+        assert "P-2  Aguas Claras,44" in csv
+        manifest = json.loads(archive.read("manifiesto_fuentes.json"))
+        assert manifest["integrity_ok"] is True
+
+
 def test_checked_in_reference_exports_include_verified_provenance():
     manifest = payroll.verificar_manifiesto_fuentes()
     example_xlsx = APP_DIR / "Escala_Salarial_3210_Nueva.xlsx"
@@ -196,8 +257,17 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
 
     pdf_bytes = app_namespace["crear_pdf"](scale, details, 1.25, manifest)
     assert pdf_bytes.startswith(b"%PDF-")
-    pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
-    assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    pdf_pages = PdfReader(BytesIO(pdf_bytes)).pages
+    page_texts = [page.extract_text() or "" for page in pdf_pages]
+    pdf_text = "\n".join(page_texts)
+    assert len(pdf_pages) == 10
+    assert all(text.strip() for text in page_texts)
+    detail_page = next(text for text in page_texts if "PLANTILLA PROPUESTA · DETALLE DE CARGOS" in text)
+    detail_lines = [line for line in detail_page.splitlines() if line.strip()]
+    assert detail_lines[0] == "PLANTILLA PROPUESTA · DETALLE DE CARGOS"
+    assert detail_lines[1].startswith("Fuente: propuesta de plantilla")
+    assert page_texts[-1].startswith("TRAZABILIDAD DE FUENTES")
+    assert all(f"Página {number} de {len(pdf_pages)}" in text for number, text in enumerate(page_texts, start=1))
     assert "Id." in pdf_text and "Hoja" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
 

@@ -35,7 +35,9 @@ def test_six_x_ceiling_holds_in_live_cargo_table():
     _assert_page_runs(app_test, "Plantilla por cargo")
     app_test.slider[-1].set_value(6.0).run(timeout=60)
     assert not app_test.exception
-    details = app_test.dataframe[0].value
+    details = next(
+        frame.value for frame in app_test.dataframe if "Id." in frame.value.columns
+    )
     assert list(details["Id."]) == list(range(1, len(details) + 1))
     assert (details["Salario ajustado (CUP)"] <= details["Tope máximo 6× (CUP)"].round(2)).all()
 
@@ -66,6 +68,22 @@ def test_system_page_reports_approved_source_integrity():
     assert any(metric.label == "Integridad SHA-256" and metric.value == "Verificada" for metric in app_test.metric)
     source_status = app_test.dataframe[-1].value
     assert set(source_status["status"]) == {"VERIFICADA"}
+
+
+def test_quality_report_shows_traceable_source_findings():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Plantilla por cargo")
+    quality_table = next(
+        frame.value for frame in app_test.dataframe
+        if "Tipo de incidencia" in frame.value.columns
+    )
+    assert set(quality_table["Tipo de incidencia"]).issubset({
+        "Posible duplicado", "Discrepancia salarial de grupo",
+        "Salario ausente", "Salario inválido", "Cargo sin descripción",
+    })
+    assert {"Hoja de origen", "Fila de origen", "Detalle"}.issubset(quality_table.columns)
+    labels = [button.label.lower() for button in app_test.get("download_button")]
+    assert any("incidencias + manifiesto" in label for label in labels)
 
 
 def test_filtered_csv_is_packaged_with_source_manifest():

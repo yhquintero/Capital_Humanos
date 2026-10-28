@@ -29,6 +29,7 @@ import hashlib
 import json
 import math
 import os
+import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -317,17 +318,31 @@ def _mejor_cargo_de_la_fila(hoja, fila: int, col_grupo: int) -> str:
     return max(candidatos, key=len) if candidatos else ""
 
 
-def extraer_propuesta_plantilla():
-    """
-    Recorre todas las hojas de cargos y devuelve:
-      mapa_canónico : {grupo: salario_propuesto}  (valor más frecuente)
-      contadores    : {grupo: Counter({salario: n})}
-      registros     : lista auditable (hoja, fila, cargo, grupo, salario)
-      anomalias     : grupos con más de un salario distinto
+def _crear_hallazgo_calidad(tipo, hoja, fila, cargo, grupo, valor, detalle):
+    return {
+        "Tipo de incidencia": tipo,
+        "Hoja de origen": hoja,
+        "Fila de origen": fila,
+        "Cargo": cargo or "(sin descripción)",
+        "Grupo": grupo,
+        "Valor detectado": valor,
+        "Detalle": detalle,
+    }
+
+
+def extraer_propuesta_plantilla_con_calidad():
+    """Extrae cargos y devuelve incidencias revisables sin modificar la fuente.
+
+    Devuelve el mismo núcleo de datos que ``extraer_propuesta_plantilla`` y una
+    lista de hallazgos con hoja/fila para salarios ausentes/no válidos, cargos
+    sin descripción, posibles duplicados exactos y valores no mayoritarios.
+    Los posibles duplicados se conservan y ninguna incidencia se corrige aquí.
     """
     libro = xlrd.open_workbook(RUTA_PLANTILLA)
     contadores: dict[str, Counter] = defaultdict(Counter)
     registros = []
+    hallazgos = []
+    vistos = {}
 
     for hoja in libro.sheets():
         if hoja.name == "Hoja1":
@@ -337,33 +352,104 @@ def extraer_propuesta_plantilla():
             continue
         col_salario = col_grupo + 1
         for r in range(fila_enc + 1, hoja.nrows):
-            grupo = hoja.cell_value(r, col_grupo)
-            if not (isinstance(grupo, str) and grupo.strip() in ROMANO_A_ENTERO):
+            grupo_raw = hoja.cell_value(r, col_grupo)
+            if not (isinstance(grupo_raw, str) and grupo_raw.strip() in ROMANO_A_ENTERO):
+                continue
+            grupo = grupo_raw.strip()
+            fila_origen = r + 1
+            cargo = _mejor_cargo_de_la_fila(hoja, r, col_grupo)
+            if not cargo:
+                hallazgos.append(_crear_hallazgo_calidad(
+                    "Cargo sin descripción", hoja.name, fila_origen, cargo, grupo, "",
+                    "La fila tiene un grupo válido, pero no se encontró texto descriptivo de cargo.",
+                ))
+
+            raw_salario = hoja.cell_value(r, col_salario) if col_salario < hoja.ncols else None
+            if raw_salario is None or (isinstance(raw_salario, str) and not raw_salario.strip()):
+                hallazgos.append(_crear_hallazgo_calidad(
+                    "Salario ausente", hoja.name, fila_origen, cargo, grupo, "",
+                    "La fila tiene un grupo válido, pero la celda de salario está vacía.",
+                ))
                 continue
             try:
-                salario = float(hoja.cell_value(r, col_salario))
-            except (TypeError, ValueError):
+                salario = float(raw_salario)
+            except (TypeError, ValueError, OverflowError):
+                hallazgos.append(_crear_hallazgo_calidad(
+                    "Salario inválido", hoja.name, fila_origen, cargo, grupo, str(raw_salario),
+                    "El salario no se puede interpretar como número; no se incluye en el cálculo.",
+                ))
                 continue
-            grupo = grupo.strip()
-            contadores[grupo][salario] += 1
-            registros.append({
-                "hoja": hoja.name, "fila": r + 1,
-                "cargo": _mejor_cargo_de_la_fila(hoja, r, col_grupo),
-                "grupo": grupo, "salario": salario,
-            })
+            if not math.isfinite(salario) or salario <= 0:
+                hallazgos.append(_crear_hallazgo_calidad(
+                    "Salario inválido", hoja.name, fila_origen, cargo, grupo, str(raw_salario),
+                    "Se esperaba un salario numérico, finito y mayor que cero; no se incluye en el cálculo.",
+                ))
+                continue
 
-    mapa_canónico = {g: cont.most_common(1)[0][0] for g, cont in contadores.items()}
+            registro = {
+                "hoja": hoja.name, "fila": fila_origen, "cargo": cargo,
+                "grupo": grupo, "salario": salario,
+            }
+            contadores[grupo][salario] += 1
+            registros.append(registro)
+
+            texto_cargo = unicodedata.normalize("NFKC", cargo).casefold()
+            texto_cargo = " ".join(texto_cargo.split())
+            clave_duplicado = (hoja.name.casefold(), grupo, texto_cargo, salario)
+            if clave_duplicado in vistos:
+                hoja_previa, fila_previa = vistos[clave_duplicado]
+                hallazgos.append(_crear_hallazgo_calidad(
+                    "Posible duplicado", hoja.name, fila_origen, cargo, grupo, f"${salario:,.2f}",
+                    f"Coincide con {hoja_previa}, fila {fila_previa}. Se conserva para revisión; no se elimina.",
+                ))
+            else:
+                vistos[clave_duplicado] = (hoja.name, fila_origen)
+
+    mapa_canonico = {g: cont.most_common(1)[0][0] for g, cont in contadores.items()}
     anomalias = []
-    for g in sorted(contadores, key=lambda x: ROMANO_A_ENTERO[x]):
-        if len(contadores[g]) > 1:
-            valores = ", ".join(
-                f"${s:,.2f} ({n} ocurrencias)" for s, n in contadores[g].most_common()
-            )
-            anomalias.append(
-                f"Grupo {g}: valores encontrados -> {valores}. "
-                f"Se adopta ${mapa_canónico[g]:,.2f} por ser el mayoritario."
-            )
-    return mapa_canónico, contadores, registros, anomalias
+    for grupo in sorted(contadores, key=lambda item: ROMANO_A_ENTERO[item]):
+        contador = contadores[grupo]
+        if len(contador) <= 1:
+            continue
+        valores = ", ".join(
+            f"${salario:,.2f} ({cantidad} ocurrencias)"
+            for salario, cantidad in contador.most_common()
+        )
+        anomalias.append(
+            f"Grupo {grupo}: valores encontrados -> {valores}. "
+            f"Se adopta ${mapa_canonico[grupo]:,.2f} por ser el mayoritario."
+        )
+        frecuencia_maxima = max(contador.values())
+        valores_mayoritarios = {
+            salario for salario, cantidad in contador.items() if cantidad == frecuencia_maxima
+        }
+        detalle = (
+            f"El grupo contiene varios salarios: {valores}. "
+            f"La tabla consolidada actual usa ${mapa_canonico[grupo]:,.2f}; "
+            "la fuente permanece intacta y debe revisarse antes del uso oficial."
+        )
+        for registro in registros:
+            if registro["grupo"] != grupo:
+                continue
+            if len(valores_mayoritarios) == 1 and registro["salario"] in valores_mayoritarios:
+                continue
+            hallazgos.append(_crear_hallazgo_calidad(
+                "Discrepancia salarial de grupo", registro["hoja"], registro["fila"],
+                registro["cargo"], grupo, f"${registro['salario']:,.2f}", detalle,
+            ))
+
+    hallazgos.sort(key=lambda item: (
+        str(item["Hoja de origen"]).casefold(),
+        item["Fila de origen"],
+        item["Tipo de incidencia"],
+    ))
+    return mapa_canonico, contadores, registros, anomalias, hallazgos
+
+
+def extraer_propuesta_plantilla():
+    """Compatibilidad: devuelve los cuatro resultados históricos de extracción."""
+    propuesta, contadores, registros, anomalias, _ = extraer_propuesta_plantilla_con_calidad()
+    return propuesta, contadores, registros, anomalias
 
 
 # ---------------------------------------------------------------------------
