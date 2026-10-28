@@ -12,5 +12,6 @@ Cambios funcionales y de operación, organizados por versión.
 - Publicada hoja de ruta priorizada con criterios de aceptación, límites de datos y necesidades de aprobación humana.
 - Añadida trazabilidad SHA-256/versionado a ejemplos y exportaciones: hoja en Excel, página en PDF y manifiesto JSON en ZIP de CSV.
 - La app compara los archivos actuales con las huellas aprobadas y advierte si encuentra cambios, faltantes o un manifiesto inconsistente.
+- Corregida la carga ambigua de `generar_escala`: la interfaz carga explícitamente el motor que está en su misma carpeta y falla con un mensaje claro si son versiones incompatibles.
 
 > Esta sección documenta cambios en esta rama; la versión no se considera publicada hasta integrar y verificar el pull request.

@@ -6,6 +6,7 @@ import json
 import math
 import runpy
 import sys
+import types
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -27,6 +28,18 @@ def app_namespace():
     # Load export helpers without starting a Streamlit server.
     with contextlib.redirect_stderr(io.StringIO()):
         return runpy.run_path(str(APP_DIR / "app_escala.py"), run_name="capital_humano_export_test")
+
+
+def test_app_loads_its_sibling_generator_even_if_module_name_is_shadowed(monkeypatch):
+    # Reproduce a stale/foreign `generar_escala` already loaded by a Windows
+    # IDE, Streamlit session, or another checkout on sys.path.
+    monkeypatch.setitem(sys.modules, "generar_escala", types.ModuleType("generar_escala"))
+    with contextlib.redirect_stderr(io.StringIO()):
+        namespace = runpy.run_path(str(APP_DIR / "app_escala.py"), run_name="capital_humano_import_test")
+
+    generator = namespace["base"]
+    assert Path(generator.__file__).resolve() == (APP_DIR / "generar_escala.py").resolve()
+    assert generator.FACTOR_MAXIMO_ABSOLUTO == 6.0
 
 
 @pytest.mark.parametrize(
