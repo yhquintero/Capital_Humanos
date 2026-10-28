@@ -52,6 +52,13 @@ def test_comparison_page_exposes_bounded_factors_and_exports():
     assert any("comparación excel" in label for label in labels)
 
 
+def test_export_page_offers_separate_approval_report():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Exportaciones")
+    labels = [button.label for button in app_test.get("download_button")]
+    assert "Descargar borrador de aprobación" in labels
+
+
 def test_system_page_reports_approved_source_integrity():
     app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
     _assert_page_runs(app_test, "Sistema y HTTPS")

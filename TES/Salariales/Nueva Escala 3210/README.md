@@ -113,7 +113,8 @@ python -m pip install -r requirements.txt
 ## Salidas y fuentes
 
 - `Escala_Salarial_3210_Nueva.xlsx` y `.pdf`: ejemplos generados por `generar_escala.py`.
-- Las descargas de la app contienen la escala completa y los 183 cargos con el multiplicador seleccionado.
+- Las descargas Excel/PDF de la app contienen la escala y los cargos con el multiplicador seleccionado; el informe de aprobación separado contiene un resumen por grupo, metodología, hashes y campos para revisión humana.
+- El informe de aprobación se marca como borrador hasta completar manualmente las revisiones y firmas; no contiene una aprobación digital ni estima el gasto total de nómina.
 - Res. 14/2026, GOC-2026-393-O60: salario mínimo mensual de $3,210.00.
 - Res. 15/2026, GOC-2026-394-O60: escala oficial de 32 grupos, jornada de 44 horas.
 - `Escala 3210_OK.xlsx`: escala histórica Res. 29/2020.
