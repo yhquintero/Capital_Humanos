@@ -2,6 +2,7 @@
 """Interfaz interactiva para recalcular e imprimir la propuesta salarial."""
 from __future__ import annotations
 
+import importlib.util
 import io
 import json
 import os
@@ -20,9 +21,20 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 CARPETA = Path(__file__).resolve().parent
 RAIZ_REPO = CARPETA.parents[2]
-if str(CARPETA) not in sys.path:
-    sys.path.insert(0, str(CARPETA))
-import generar_escala as base  # noqa: E402
+RUTA_GENERADOR = CARPETA / "generar_escala.py"
+_SPEC_GENERADOR = importlib.util.spec_from_file_location(
+    "_capital_humano_generar_escala", RUTA_GENERADOR
+)
+if _SPEC_GENERADOR is None or _SPEC_GENERADOR.loader is None:
+    raise ImportError(f"No se pudo cargar el motor salarial desde {RUTA_GENERADOR}")
+base = importlib.util.module_from_spec(_SPEC_GENERADOR)
+sys.modules[_SPEC_GENERADOR.name] = base
+_SPEC_GENERADOR.loader.exec_module(base)
+if not hasattr(base, "FACTOR_MAXIMO_ABSOLUTO"):
+    raise ImportError(
+        "El motor salarial junto a la aplicación no define FACTOR_MAXIMO_ABSOLUTO: "
+        f"{RUTA_GENERADOR}. Verifica que ambos archivos sean de la misma versión."
+    )
 
 # Permite el comando intuitivo `python app_escala.py` sin ejecutar widgets en
 # modo bare. La ejecución normal de Streamlit ya tiene ScriptRunContext y sigue
