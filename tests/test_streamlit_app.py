@@ -53,6 +53,22 @@ def test_comparison_page_exposes_bounded_factors_and_exports():
     labels = [button.label.lower() for button in app_test.get("download_button")]
     assert any("csv + manifiesto" in label for label in labels)
     assert any("comparación excel" in label for label in labels)
+    assert any("csv por cargo" in label for label in labels)
+    assert any("por cargo excel" in label for label in labels)
+
+
+def test_cargo_scenario_comparison_preserves_detail_ids_and_origin():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Comparar escenarios")
+    comparison = next(
+        frame.value for frame in app_test.dataframe
+        if "Factor A" in frame.value.columns and "Id." in frame.value.columns
+    )
+    assert len(comparison) == 183
+    assert list(comparison["Id."]) == list(range(1, 184))
+    assert {"Hoja de origen", "Fila de origen", "Variación B − A (CUP)"}.issubset(comparison.columns)
+    assert (comparison["Salario A (CUP)"] <= comparison["Salario fuente (CUP)"] * 6).all()
+    assert (comparison["Salario B (CUP)"] <= comparison["Salario fuente (CUP)"] * 6).all()
 
 
 def test_export_page_offers_separate_approval_report():
@@ -60,6 +76,12 @@ def test_export_page_offers_separate_approval_report():
     _assert_page_runs(app_test, "Exportaciones")
     labels = [button.label for button in app_test.get("download_button")]
     assert "Descargar borrador de aprobación" in labels
+    assert "Descargar paquete completo (.zip)" in labels
+    preflight = next(
+        frame.value for frame in app_test.dataframe
+        if {"Control", "Resultado", "Detalle"}.issubset(frame.value.columns)
+    )
+    assert set(preflight["Resultado"]) == {"Correcto"}
 
 
 def test_system_page_reports_approved_source_integrity():
@@ -84,6 +106,20 @@ def test_quality_report_shows_traceable_source_findings():
     assert {"Hoja de origen", "Fila de origen", "Detalle"}.issubset(quality_table.columns)
     labels = [button.label.lower() for button in app_test.get("download_button")]
     assert any("incidencias + manifiesto" in label for label in labels)
+    review = app_test.session_state["revision_calidad_actual"]
+    assert len(review) == len(quality_table)
+    assert set(review["Estado de revisión"]) == {"Pendiente"}
+    assert {"ID incidencia", "Nota de revisión"}.issubset(review.columns)
+
+    app_test.session_state["editor_revision_calidad"] = {
+        "edited_rows": {0: {"Estado de revisión": "Revisada", "Nota de revisión": "Confirmado en el expediente."}},
+        "added_rows": [],
+        "deleted_rows": [],
+    }
+    app_test.run(timeout=60)
+    retained = app_test.session_state["revision_calidad_actual"]
+    assert retained.loc[0, "Estado de revisión"] == "Revisada"
+    assert retained.loc[0, "Nota de revisión"] == "Confirmado en el expediente."
 
 
 def test_filtered_csv_is_packaged_with_source_manifest():

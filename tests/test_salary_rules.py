@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import math
@@ -150,6 +151,41 @@ def test_comparison_keeps_missing_groups_official_and_caps_proposed_groups():
     )
 
 
+def test_cargo_comparison_preserves_ids_origin_and_six_x_cap(app_namespace):
+    _, _, records, _ = payroll.extraer_propuesta_plantilla()
+    comparison = app_namespace["crear_comparacion_cargos"](1.25, 6.0, records)
+
+    assert len(comparison) == len(records) == 183
+    assert list(comparison["Id."]) == list(range(1, len(records) + 1))
+    first = comparison.iloc[0]
+    assert first["Hoja de origen"] == records[0]["hoja"]
+    assert first["Fila de origen"] == records[0]["fila"]
+    assert first["Salario A (CUP)"] == pytest.approx(first["Salario fuente (CUP)"] * 1.25)
+    assert (comparison["Salario A (CUP)"] <= comparison["Salario fuente (CUP)"] * 6).all()
+    assert (comparison["Salario B (CUP)"] <= comparison["Salario fuente (CUP)"] * 6).all()
+    expected_relative = comparison["Salario B (CUP)"] / comparison["Salario A (CUP)"] - 1
+    assert comparison["Variación relativa"].to_numpy() == pytest.approx(expected_relative.to_numpy())
+    with pytest.raises(ValueError):
+        app_namespace["crear_comparacion_cargos"](0.9, 1.5, records)
+
+
+def test_cargo_comparison_workbook_is_readable_and_traceable(app_namespace):
+    _, _, records, _ = payroll.extraer_propuesta_plantilla()
+    comparison = app_namespace["crear_comparacion_cargos"](1.0, 1.5, records)
+    manifest = payroll.verificar_manifiesto_fuentes()
+    data = app_namespace["crear_excel_comparacion_cargos"](comparison, 1.0, 1.5, manifest)
+    workbook = load_workbook(BytesIO(data), data_only=True)
+    sheet = workbook["Comparación por cargo"]
+
+    assert sheet.max_row == len(records) + 3
+    assert sheet.max_column == 12
+    assert sheet["A1"].value == "COMPARACIÓN DE ESCENARIOS · DETALLE POR CARGO"
+    assert sheet["A4"].value == 1
+    assert sheet["G4"].number_format == '0.00"×"'
+    assert sheet["L4"].number_format == "0.00%"
+    assert "Trazabilidad SHA-256" in workbook.sheetnames
+
+
 def test_comparison_workbook_is_readable_and_contains_source_hashes(app_namespace):
     proposal, _, _, _ = payroll.extraer_propuesta_plantilla()
     previous = payroll.cargar_salarios_res29()
@@ -191,6 +227,107 @@ def test_approved_source_manifest_matches_all_tracked_files():
     assert manifest["application_version"] == payroll.VERSION_APP
     assert len(manifest["sources"]) == len(payroll.FUENTES_CONTROLADAS)
     assert all(len(source["actual_sha256"]) == 64 for source in manifest["sources"])
+
+
+def test_export_preflight_accepts_consistent_data_and_blocks_invariant_failures(app_namespace):
+    proposal, _, records, _ = payroll.extraer_propuesta_plantilla()
+    previous = payroll.cargar_salarios_res29()
+    scale, detail = app_namespace["crear_tablas"](1.25, proposal, records, previous)
+    manifest = {**payroll.verificar_manifiesto_fuentes(), "integrity_ok": True}
+
+    checks, ready = app_namespace["validar_preexportacion"](
+        scale, detail, 1.25, manifest, len(records)
+    )
+    assert ready is True
+    assert set(checks["Resultado"]) == {"Correcto"}
+
+    duplicate_ids = detail.copy()
+    duplicate_ids.loc[duplicate_ids.index[-1], "Id."] = 1
+    failed_ids, ids_ready = app_namespace["validar_preexportacion"](
+        scale, duplicate_ids, 1.25, manifest, len(records)
+    )
+    assert ids_ready is False
+    assert failed_ids.set_index("Control").loc["Id. únicos y consecutivos", "Resultado"] == "ERROR"
+
+    _, factor_ready = app_namespace["validar_preexportacion"](
+        scale, detail, 2.0, manifest, len(records)
+    )
+    assert factor_ready is False
+    _, factor_range_ready = app_namespace["validar_preexportacion"](
+        scale, detail, 6.5, manifest, len(records)
+    )
+    assert factor_range_ready is False
+    _, count_ready = app_namespace["validar_preexportacion"](
+        scale, detail, 1.25, manifest, len(records) + 1
+    )
+    assert count_ready is False
+
+    _, manifest_ready = app_namespace["validar_preexportacion"](
+        scale, detail, 1.25, {**manifest, "integrity_ok": False}, len(records)
+    )
+    assert manifest_ready is False
+
+
+def test_complete_export_package_contains_outputs_parameters_and_verifiable_hashes(app_namespace):
+    proposal, _, records, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    detail = app_namespace["crear_tablas"](
+        1.25, proposal, records, payroll.cargar_salarios_res29()
+    )[1]
+    review = app_namespace["crear_tabla_revision_calidad"](findings)
+    review.loc[0, "Estado de revisión"] = "En revisión"
+    review.loc[0, "Nota de revisión"] = "Validación documentada."
+    manifest = {"application_version": "test", "sources": []}
+    package = app_namespace["crear_paquete_completo"](
+        b"xlsx-output", b"pdf-output", b"approval-draft", 1.25, detail, review, manifest
+    )
+
+    with zipfile.ZipFile(BytesIO(package)) as archive:
+        names = set(archive.namelist())
+        assert {
+            "Propuesta_Escala_Resolucion87_1.25x.xlsx",
+            "Propuesta_Escala_Resolucion87_1.25x.pdf",
+            "Informe_Aprobacion_Capital_Humano_1.25x.pdf",
+            "Parametros_escenario.json",
+            "Incidencias_calidad_revisadas.csv",
+            "manifiesto_fuentes.json",
+            "hashes_salidas.json",
+        }.issubset(names)
+        parameters = json.loads(archive.read("Parametros_escenario.json"))
+        assert parameters["factor"] == 1.25
+        assert parameters["factor_cap"] == 6
+        assert parameters["source_cargo_rows"] == 183
+        assert parameters["approval_document_status"] == "DRAFT — NOT APPROVED"
+        hashes = json.loads(archive.read("hashes_salidas.json"))
+        assert hashes["algorithm"] == "SHA-256"
+        assert {entry["file"] for entry in hashes["files"]} == names - {"hashes_salidas.json"}
+        for entry in hashes["files"]:
+            content = archive.read(entry["file"])
+            assert len(content) == entry["bytes"]
+            assert hashlib.sha256(content).hexdigest() == entry["sha256"]
+        exported_review = pd.read_csv(archive.open("Incidencias_calidad_revisadas.csv"))
+        assert exported_review.loc[0, "Estado de revisión"] == "En revisión"
+        assert exported_review.loc[0, "Nota de revisión"] == "Validación documentada."
+
+
+def test_quality_review_rows_have_stable_ids_and_export_manual_annotations(app_namespace):
+    _, _, _, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    first = app_namespace["crear_tabla_revision_calidad"](findings)
+    second = app_namespace["crear_tabla_revision_calidad"](findings)
+    assert first["ID incidencia"].tolist() == second["ID incidencia"].tolist()
+    assert first["ID incidencia"].is_unique
+    assert set(first["Estado de revisión"]) == {"Pendiente"}
+    assert set(first["Nota de revisión"]) == {""}
+
+    first.loc[0, "Estado de revisión"] = "Revisada"
+    first.loc[0, "Nota de revisión"] = "Confirmado con el área de origen."
+    package = app_namespace["crear_zip_csv_con_manifiesto"](
+        first, "Incidencias_calidad_revisadas.csv", payroll.verificar_manifiesto_fuentes()
+    )
+    with zipfile.ZipFile(BytesIO(package)) as archive:
+        exported = pd.read_csv(archive.open("Incidencias_calidad_revisadas.csv"))
+    assert exported.loc[0, "Estado de revisión"] == "Revisada"
+    assert exported.loc[0, "Nota de revisión"] == "Confirmado con el área de origen."
+    assert exported.loc[0, "ID incidencia"] == first.loc[0, "ID incidencia"]
 
 
 def test_quality_findings_zip_contains_source_locations_and_manifest(app_namespace):

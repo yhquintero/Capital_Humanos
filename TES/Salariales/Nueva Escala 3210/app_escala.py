@@ -2,14 +2,16 @@
 """Interfaz interactiva para recalcular e imprimir la propuesta salarial."""
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import io
 import json
+import math
 import os
 import platform
 import sys
 import zipfile
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -121,6 +123,108 @@ def crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior):
     return pd.DataFrame(base.comparar_escenarios(factor_a, factor_b, propuesta, anterior))
 
 
+def crear_comparacion_cargos(factor_a, factor_b, registros):
+    """Compara dos factores por cargo, preservando Id. y coordenadas de origen."""
+    factores = (float(factor_a), float(factor_b))
+    if any(not math.isfinite(value) or not 1 <= value <= base.FACTOR_MAXIMO_ABSOLUTO for value in factores):
+        raise ValueError("Los factores deben estar entre 1× y 6×.")
+    columnas = [
+        "Id.", "Hoja de origen", "Fila de origen", "Cargo", "Grupo propuesto",
+        "Salario fuente (CUP)", "Factor A", "Salario A (CUP)", "Factor B",
+        "Salario B (CUP)", "Variación B − A (CUP)", "Variación relativa",
+    ]
+    filas = []
+    for item_id, registro in enumerate(registros, start=1):
+        salario = float(registro["salario"])
+        salario_a = base.aplicar_factor_con_tope(salario, factores[0])
+        salario_b = base.aplicar_factor_con_tope(salario, factores[1])
+        variacion = salario_b - salario_a
+        filas.append({
+            "Id.": item_id,
+            "Hoja de origen": _texto_visible(registro.get("hoja")),
+            "Fila de origen": registro.get("fila"),
+            "Cargo": _texto_visible(registro.get("cargo")),
+            "Grupo propuesto": _texto_visible(registro.get("grupo")),
+            "Salario fuente (CUP)": salario,
+            "Factor A": factores[0],
+            "Salario A (CUP)": salario_a,
+            "Factor B": factores[1],
+            "Salario B (CUP)": salario_b,
+            "Variación B − A (CUP)": variacion,
+            "Variación relativa": variacion / salario_a if salario_a else 0.0,
+        })
+    return pd.DataFrame(filas, columns=columnas)
+
+
+def crear_excel_comparacion_cargos(comparacion: pd.DataFrame, factor_a: float, factor_b: float, manifiesto: dict) -> bytes:
+    """Crea un libro filtrable de comparación A/B por cargo y con trazabilidad."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparación por cargo"
+    ws.sheet_view.showGridLines = False
+    ultima_columna = get_column_letter(len(comparacion.columns))
+    ws.append(["COMPARACIÓN DE ESCENARIOS · DETALLE POR CARGO"])
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(comparacion.columns))
+    ws.append([f"Escenario A: {factor_a:.2f}× · Escenario B: {factor_b:.2f}× · CUP · {date.today():%d/%m/%Y}"])
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(comparacion.columns))
+    ws.append(list(comparacion.columns))
+    for values in comparacion.itertuples(index=False, name=None):
+        ws.append([None if _es_vacio(value) else value for value in values])
+
+    for cell in ws[1]:
+        cell.fill = PatternFill("solid", fgColor=AZUL)
+        cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
+    for cell in ws[2]:
+        cell.fill = PatternFill("solid", fgColor="EAF0F4")
+        cell.font = Font(name="Calibri", size=10, italic=True, color=AZUL)
+    for cell in ws[3]:
+        cell.fill = PatternFill("solid", fgColor=VERDE)
+        cell.font = Font(name="Calibri", size=9, bold=True, color="FFFFFF")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[2].height = 24
+    ws.row_dimensions[3].height = 36
+    borde = Side(style="hair", color="CBD5DC")
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
+        for cell in row:
+            cell.border = Border(bottom=borde)
+            cell.alignment = Alignment(vertical="center", wrap_text=cell.column in (2, 4))
+        for index, nombre in enumerate(comparacion.columns, start=1):
+            if "CUP" in nombre:
+                row[index - 1].number_format = '"$"#,##0.00;[Red]-"$"#,##0.00'
+            elif nombre.startswith("Factor "):
+                row[index - 1].number_format = '0.00"×"'
+            elif nombre == "Variación relativa":
+                row[index - 1].number_format = "0.00%"
+            elif nombre in {"Id.", "Fila de origen"}:
+                row[index - 1].number_format = "0"
+    anchos = {
+        "Id.": 9, "Hoja de origen": 26, "Fila de origen": 12, "Cargo": 50,
+        "Grupo propuesto": 17, "Salario fuente (CUP)": 22, "Factor A": 13,
+        "Salario A (CUP)": 20, "Factor B": 13, "Salario B (CUP)": 20,
+        "Variación B − A (CUP)": 25, "Variación relativa": 20,
+    }
+    for index, nombre in enumerate(comparacion.columns, start=1):
+        ws.column_dimensions[get_column_letter(index)].width = anchos.get(nombre, 18)
+    if ws.max_row > 3:
+        tabla = Table(displayName="ComparacionPorCargo", ref=f"A3:{ultima_columna}{ws.max_row}")
+        tabla.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+        ws.add_table(tabla)
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:{ultima_columna}{ws.max_row}"
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.print_title_rows = "1:3"
+    ws.print_area = f"A1:{ultima_columna}{ws.max_row}"
+    agregar_hoja_trazabilidad(wb, manifiesto)
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
 def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b: float, manifiesto: dict) -> bytes:
     """Crea un Excel de comparación, listo para filtrar e imprimir en A4."""
     wb = Workbook()
@@ -175,6 +279,79 @@ def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b
     return buffer.getvalue()
 
 
+def validar_preexportacion(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict, cantidad_esperada: int):
+    """Valida invariantes de exportación sin tocar ni reparar los datos."""
+    controles = []
+
+    def registrar(nombre, correcto, detalle_control):
+        controles.append({
+            "Control": nombre,
+            "Resultado": "Correcto" if correcto else "ERROR",
+            "Detalle": detalle_control,
+        })
+
+    try:
+        factor_numerico = float(factor)
+        factor_valido = math.isfinite(factor_numerico) and 1.0 <= factor_numerico <= base.FACTOR_MAXIMO_ABSOLUTO
+    except (TypeError, ValueError, OverflowError):
+        factor_numerico = math.nan
+        factor_valido = False
+    registrar("Factor dentro del rango 1×–6×", factor_valido, f"Factor activo: {factor}.")
+    registrar(
+        "Integridad SHA-256 de las fuentes",
+        manifiesto.get("integrity_ok") is True,
+        "Todas las fuentes y códigos coinciden con el manifiesto aprobado." if manifiesto.get("integrity_ok") is True else "Hay fuentes/código por revisar; las descargas quedan bloqueadas.",
+    )
+
+    escala_correcta = (
+        "Grupo" in escala.columns
+        and len(escala) == 32
+        and escala["Grupo"].nunique(dropna=False) == 32
+    )
+    registrar("Escala completa", escala_correcta, f"Se esperan 32 grupos; encontrados: {len(escala)}.")
+    registrar(
+        "Cantidad de filas de detalle",
+        len(detalle) == cantidad_esperada,
+        f"Registros extraídos: {cantidad_esperada}; filas a exportar: {len(detalle)}.",
+    )
+
+    id_correcto = False
+    factor_coincide = False
+    limite_correcto = False
+    campos_completos = False
+    columnas_requeridas = {
+        "Id.", "Hoja de origen", "Fila de origen", "Grupo propuesto",
+        "Salario original (CUP)", "Factor aplicado",
+        "Tope máximo 6× (CUP)", "Salario ajustado (CUP)",
+    }
+    if columnas_requeridas.issubset(detalle.columns):
+        id_correcto = detalle["Id."].tolist() == list(range(1, len(detalle) + 1))
+        factores = pd.to_numeric(detalle["Factor aplicado"], errors="coerce")
+        factor_coincide = math.isfinite(factor_numerico) and factores.notna().all() and all(
+            math.isclose(float(value), factor_numerico, rel_tol=0, abs_tol=1e-9)
+            for value in factores
+        )
+        salarios = pd.to_numeric(detalle["Salario ajustado (CUP)"], errors="coerce")
+        topes = pd.to_numeric(detalle["Tope máximo 6× (CUP)"], errors="coerce").round(2)
+        limite_correcto = salarios.notna().all() and topes.notna().all() and salarios.le(topes + 1e-9).all()
+        campos_a_revisar = [
+            "Id.", "Hoja de origen", "Fila de origen", "Grupo propuesto",
+            "Salario original (CUP)", "Factor aplicado",
+            "Tope máximo 6× (CUP)", "Salario ajustado (CUP)",
+        ]
+        campos_completos = not detalle[campos_a_revisar].isna().any().any()
+    registrar("Id. únicos y consecutivos", id_correcto, "Los identificadores deben ser 1…N, sin huecos ni duplicados.")
+    registrar("Factor de cada fila coincide", factor_coincide, "Todas las filas deben usar el factor mostrado en el escenario activo.")
+    registrar("Tope 6× por cargo", limite_correcto, "Cada salario exportado debe estar bajo su tope individual.")
+    registrar("Campos requeridos completos", campos_completos, "Se requieren origen, fila, grupo, base, factor y valores calculados.")
+    if not columnas_requeridas.issubset(detalle.columns):
+        registrar("Estructura de detalle", False, "Faltan una o más columnas necesarias para generar informes auditables.")
+
+    informe = pd.DataFrame(controles)
+    listo = informe["Resultado"].eq("Correcto").all()
+    return informe, bool(listo)
+
+
 def agregar_hoja_trazabilidad(wb: Workbook, manifiesto: dict) -> None:
     """Añade la hoja de trazabilidad compartida con el generador de cálculos."""
     base.agregar_hoja_trazabilidad(wb, manifiesto)
@@ -194,6 +371,82 @@ def crear_zip_csv_con_manifiesto(df: pd.DataFrame, csv_name: str, manifiesto: di
             "El CSV conserva sus filas y columnas. El manifiesto JSON identifica las fuentes y compara los hashes observados con los aprobados en el repositorio. SHA-256 detecta diferencias de bytes; no es firma digital ni certificación normativa.\n",
         )
     return buffer.getvalue()
+
+
+def crear_paquete_completo(excel_bytes, pdf_bytes, aprobacion_bytes, factor, detalle, revision_calidad, manifiesto):
+    """Empaqueta los documentos del mismo escenario y un inventario SHA-256."""
+    sufijo = f"{float(factor):.2f}x"
+    fecha_creacion = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    archivos = {
+        f"Propuesta_Escala_Resolucion87_{sufijo}.xlsx": excel_bytes,
+        f"Propuesta_Escala_Resolucion87_{sufijo}.pdf": pdf_bytes,
+        f"Informe_Aprobacion_Capital_Humano_{sufijo}.pdf": aprobacion_bytes,
+    }
+    parametros = {
+        "application_version": manifiesto.get("application_version", base.VERSION_APP),
+        "generated_at_utc": fecha_creacion,
+        "scenario_date": date.today().isoformat(),
+        "factor": float(factor),
+        "factor_cap": base.FACTOR_MAXIMO_ABSOLUTO,
+        "currency": "CUP",
+        "source_cargo_rows": int(len(detalle)),
+        "scale_groups": 32,
+        "approval_document_status": "DRAFT — NOT APPROVED",
+        "approval_document_filename": f"Informe_Aprobacion_Capital_Humano_{sufijo}.pdf",
+    }
+    archivos["Parametros_escenario.json"] = json.dumps(
+        parametros, ensure_ascii=False, indent=2, sort_keys=True
+    ).encode("utf-8")
+    archivos["Incidencias_calidad_revisadas.csv"] = revision_calidad.to_csv(
+        index=False, lineterminator="\n"
+    ).encode("utf-8-sig")
+    archivos["manifiesto_fuentes.json"] = json.dumps(
+        manifiesto, ensure_ascii=False, indent=2, sort_keys=True, default=str
+    ).encode("utf-8")
+    readme = (
+        "PAQUETE DE EXPORTACIÓN · CAPITAL HUMANO\n"
+        f"Escenario: {float(factor):.2f}× · Moneda: CUP · Registros: {len(detalle)}\n"
+        "El informe de aprobación es un borrador y no constituye una autorización.\n"
+        "Incidencias y notas: revisión manual de esta sesión; no altera la plantilla fuente.\n"
+        "Los hashes SHA-256 de los demás archivos se encuentran en hashes_salidas.json.\n"
+        "Trate todos los documentos como información salarial sensible.\n"
+    ).encode("utf-8")
+    archivos["LEEME.txt"] = readme
+    inventario_hashes = {
+        "algorithm": "SHA-256",
+        "generated_at_utc": fecha_creacion,
+        "coverage": "All package files except this hashes_salidas.json file.",
+        "files": [
+            {"file": nombre, "bytes": len(contenido), "sha256": hashlib.sha256(contenido).hexdigest()}
+            for nombre, contenido in sorted(archivos.items())
+        ],
+    }
+    archivos["hashes_salidas.json"] = json.dumps(
+        inventario_hashes, ensure_ascii=False, indent=2, sort_keys=True
+    ).encode("utf-8")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for nombre, contenido in archivos.items():
+            archive.writestr(nombre, contenido)
+    return buffer.getvalue()
+
+
+def crear_tabla_revision_calidad(hallazgos):
+    """Prepara incidencias con un ID estable y campos de revisión humana editables."""
+    columnas_reporte = [
+        "Tipo de incidencia", "Hoja de origen", "Fila de origen", "Cargo",
+        "Grupo", "Valor detectado", "Detalle",
+    ]
+    reporte = pd.DataFrame(hallazgos, columns=columnas_reporte)
+    reporte.insert(0, "ID incidencia", [
+        "Q-" + hashlib.sha256(
+            "|".join(str(fila.get(columna, "")) for columna in columnas_reporte).encode("utf-8")
+        ).hexdigest()[:12].upper()
+        for fila in hallazgos
+    ])
+    reporte["Estado de revisión"] = "Pendiente"
+    reporte["Nota de revisión"] = ""
+    return reporte
 
 
 def _es_vacio(value) -> bool:
@@ -730,6 +983,14 @@ with st.sidebar:
     st.caption("**Fuentes activas**\n\nRes. 14/2026 · Res. 15/2026 (44 h) · plantilla propuesta .xls")
 
 escala_df, detalle_df = crear_tablas(factor, propuesta, registros, anterior)
+revision_calidad_base = crear_tabla_revision_calidad(hallazgos_calidad)
+firma_incidencias = hashlib.sha256(
+    "|".join(revision_calidad_base["ID incidencia"].tolist()).encode("utf-8")
+).hexdigest()
+if st.session_state.get("firma_incidencias_calidad") != firma_incidencias:
+    st.session_state["firma_incidencias_calidad"] = firma_incidencias
+    st.session_state["revision_calidad_actual"] = revision_calidad_base.copy()
+    st.session_state.pop("editor_revision_calidad", None)
 assert detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all()
 propuesta_rows = escala_df[escala_df["Fuente del salario"] == "Plantilla Resolución 87"]
 variacion = detalle_df["Salario ajustado (CUP)"].sum() - detalle_df["Salario original (CUP)"].sum()
@@ -825,41 +1086,87 @@ elif vista == "Escala salarial":
         """)
 
 elif vista == "Comparar escenarios":
-    encabezado("Comparar escenarios", "Contrasta dos factores en paralelo, revisa diferencias por grupo y conserva la trazabilidad del archivo exportado.")
+    encabezado("Comparar escenarios", "Contrasta dos factores en paralelo por grupo o por cargo, sin convertir la suma en un presupuesto de nómina.")
     ca, cb = st.columns(2)
     factor_a = ca.slider("Escenario A · factor", 1.0, 6.0, 1.0, 0.05, format="%.2f×", key="comparador_a")
     factor_b = cb.slider("Escenario B · factor", 1.0, 6.0, 1.5, 0.05, format="%.2f×", key="comparador_b")
-    comparacion_df = crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior)
-    grupos_modificados = comparacion_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
-    maxima_variacion = comparacion_df["Variación B − A (CUP)"].abs().max()
-    k1, k2, k3 = st.columns(3)
-    k1.metric("Grupos con cambio", f"{grupos_modificados} de {len(comparacion_df)}")
-    k2.metric("Mayor cambio por grupo", f"${maxima_variacion:,.2f}")
-    k3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
-    grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]]
-    st.bar_chart(grafico_comparacion, width="stretch", height=350)
-    st.dataframe(
-        comparacion_df, width="stretch", hide_index=True,
-        column_config={
-            "Escenario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Escenario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Variación relativa": st.column_config.NumberColumn(format="percent"),
-        },
-    )
-    st.warning("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina.")
-    out_csv, out_xlsx = st.columns(2)
-    csv_comparacion = crear_zip_csv_con_manifiesto(comparacion_df, "Comparacion_escenarios_Capital_Humano.csv", manifiesto)
-    with out_csv:
-        st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_Capital_Humano.zip", "application/zip", width="stretch")
-    with out_xlsx:
-        xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b, manifiesto)
-        st.download_button(
-            "Descargar comparación Excel", xlsx_comparacion,
-            f"Comparacion_escenarios_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width="stretch",
+    grupo_tab, cargo_tab = st.tabs(["Resumen por grupo", "Detalle por cargo"])
+
+    with grupo_tab:
+        comparacion_df = crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior)
+        grupos_modificados = comparacion_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
+        maxima_variacion = comparacion_df["Variación B − A (CUP)"].abs().max()
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Grupos con cambio", f"{grupos_modificados} de {len(comparacion_df)}")
+        k2.metric("Mayor cambio por grupo", f"${maxima_variacion:,.2f}")
+        k3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
+        grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]]
+        st.bar_chart(grafico_comparacion, width="stretch", height=350)
+        st.dataframe(
+            comparacion_df, width="stretch", hide_index=True,
+            column_config={
+                "Escenario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Escenario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Variación relativa": st.column_config.NumberColumn(format="percent"),
+            },
         )
+        st.warning("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina.")
+        out_csv, out_xlsx = st.columns(2)
+        csv_comparacion = crear_zip_csv_con_manifiesto(comparacion_df, "Comparacion_escenarios_grupo.csv", manifiesto)
+        with out_csv:
+            st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_grupo.zip", "application/zip", width="stretch")
+        with out_xlsx:
+            xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b, manifiesto)
+            st.download_button(
+                "Descargar comparación Excel", xlsx_comparacion,
+                f"Comparacion_escenarios_grupo_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                width="stretch",
+            )
+
+    with cargo_tab:
+        comparacion_cargos_df = crear_comparacion_cargos(factor_a, factor_b, registros)
+        cargos_modificados = comparacion_cargos_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
+        maximo_cambio_cargo = comparacion_cargos_df["Variación B − A (CUP)"].abs().max() if not comparacion_cargos_df.empty else 0
+        d1, d2, d3 = st.columns(3)
+        d1.metric("Cargos con cambio", f"{cargos_modificados} de {len(comparacion_cargos_df)}")
+        d2.metric("Mayor cambio por cargo", f"${maximo_cambio_cargo:,.2f}")
+        d3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
+        st.dataframe(
+            comparacion_cargos_df, width="stretch", hide_index=True,
+            column_config={
+                "Id.": st.column_config.NumberColumn(format="%.0f"),
+                "Fila de origen": st.column_config.NumberColumn(format="%.0f"),
+                "Salario fuente (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Salario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Salario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Factor A": st.column_config.NumberColumn(format="%.2f×"),
+                "Factor B": st.column_config.NumberColumn(format="%.2f×"),
+                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Variación relativa": st.column_config.NumberColumn(format="percent"),
+            },
+        )
+        st.warning("Esta comparación es por cargo y no calcula costo total de nómina. Los dos salarios de cada fila respetan el tope absoluto de 6× la fuente.")
+        detalle_csv, detalle_xlsx = st.columns(2)
+        paquete_detalle_csv = crear_zip_csv_con_manifiesto(
+            comparacion_cargos_df, "Comparacion_escenarios_por_cargo.csv", manifiesto
+        )
+        with detalle_csv:
+            st.download_button(
+                "Descargar CSV por cargo + manifiesto (.zip)", paquete_detalle_csv,
+                "Comparacion_escenarios_por_cargo.zip", "application/zip", width="stretch",
+            )
+        with detalle_xlsx:
+            detalle_xlsx_bytes = crear_excel_comparacion_cargos(
+                comparacion_cargos_df, factor_a, factor_b, manifiesto
+            )
+            st.download_button(
+                "Descargar comparación por cargo Excel", detalle_xlsx_bytes,
+                f"Comparacion_escenarios_cargos_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                width="stretch",
+            )
 
 elif vista == "Plantilla por cargo":
     encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
@@ -884,8 +1191,29 @@ elif vista == "Plantilla por cargo":
             "La escala consolidada mantiene la regla actual del valor mayoritario ante discrepancias."
         )
         st.dataframe(hallazgos_df, width="stretch", hide_index=True)
+        st.subheader("Revisión manual de incidencias")
+        st.caption("El estado y la nota se conservan durante esta sesión y en la descarga; no se escriben en la plantilla original ni en los archivos fuente.")
+        revision_calidad_df = st.data_editor(
+            st.session_state["revision_calidad_actual"],
+            width="stretch", hide_index=True, key="editor_revision_calidad",
+            disabled=[
+                "ID incidencia", "Tipo de incidencia", "Hoja de origen", "Fila de origen",
+                "Cargo", "Grupo", "Valor detectado", "Detalle",
+            ],
+            column_config={
+                "Estado de revisión": st.column_config.SelectboxColumn(
+                    "Estado de revisión",
+                    options=["Pendiente", "En revisión", "Revisada", "No aplica"],
+                    required=True,
+                ),
+                "Nota de revisión": st.column_config.TextColumn(
+                    "Nota de revisión", max_chars=500,
+                ),
+            },
+        )
+        st.session_state["revision_calidad_actual"] = revision_calidad_df.copy()
         paquete_calidad = crear_zip_csv_con_manifiesto(
-            hallazgos_df, "Incidencias_calidad_plantilla.csv", manifiesto
+            revision_calidad_df, "Incidencias_calidad_revisadas.csv", manifiesto
         )
         st.download_button(
             "Descargar incidencias + manifiesto (.zip)", paquete_calidad,
@@ -916,40 +1244,72 @@ elif vista == "Plantilla por cargo":
     st.download_button("Descargar filtro CSV + manifiesto (.zip)", csv, "Plantilla_Resolucion87_filtrada.zip", "application/zip")
 
 elif vista == "Exportaciones":
-    encabezado("Exportar y presentar", "Genera documentos consistentes con el escenario mostrado en el panel.")
+    encabezado("Exportar y presentar", "Valida el escenario antes de preparar documentos consistentes para revisión.")
     st.write(f"**Escenario activo:** {factor:.2f}× · **Cargos:** {len(detalle_df)} · **Fecha:** {date.today():%d/%m/%Y}")
-    st.info("El Excel y el PDF detallado incluyen trazabilidad SHA-256. El informe de aprobación es un borrador imprimible con metodología, resumen por grupo y campos para revisión humana.")
-    with st.spinner("Preparando los archivos para descarga…"):
-        excel_bytes = crear_excel(escala_df, detalle_df, factor, manifiesto)
-        pdf_bytes = crear_pdf(escala_df, detalle_df, factor, manifiesto)
-        informe_aprobacion_bytes = crear_informe_aprobacion_pdf(
-            escala_df, detalle_df, factor, manifiesto, anomalias
-        )
-    e1, e2, e3 = st.columns(3)
-    with e1:
-        st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
-        st.download_button(
-            "Descargar Excel (.xlsx)", excel_bytes,
-            f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width="stretch",
-        )
-    with e2:
-        st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida, detalle paginado y página de trazabilidad.</p></div>", unsafe_allow_html=True)
-        st.download_button(
-            "Descargar PDF imprimible", pdf_bytes,
-            f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
-            "application/pdf", width="stretch",
-        )
-    with e3:
-        st.markdown("<div class='ch-card'><h3>📝 Informe para aprobación</h3><p>Metodología, resumen por grupo, fuentes y espacios para decisión y firmas manuscritas.</p></div>", unsafe_allow_html=True)
-        st.download_button(
-            "Descargar borrador de aprobación",
+    st.info("Excel, PDF e informe de aprobación se generan desde la misma escala, detalle, factor y manifiesto. El informe de aprobación permanece como borrador.")
+    preflight_df, exportacion_lista = validar_preexportacion(
+        escala_df, detalle_df, factor, manifiesto, len(registros)
+    )
+    st.subheader("Comprobaciones previas a la descarga")
+    st.dataframe(preflight_df, width="stretch", hide_index=True)
+    if not exportacion_lista:
+        st.error("Las descargas quedan bloqueadas hasta corregir las comprobaciones marcadas como ERROR. No se modificó ninguna fuente.")
+    else:
+        if hallazgos_calidad:
+            st.warning(
+                f"Hay {len(hallazgos_calidad)} incidencias de calidad pendientes de revisión. "
+                "Puedes descargar los informes para revisión, pero no interpretes su generación como resolución de esas incidencias."
+            )
+        with st.spinner("Preparando los archivos para descarga…"):
+            excel_bytes = crear_excel(escala_df, detalle_df, factor, manifiesto)
+            pdf_bytes = crear_pdf(escala_df, detalle_df, factor, manifiesto)
+            informe_aprobacion_bytes = crear_informe_aprobacion_pdf(
+                escala_df, detalle_df, factor, manifiesto, anomalias
+            )
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
+            st.download_button(
+                "Descargar Excel (.xlsx)", excel_bytes,
+                f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                width="stretch",
+            )
+        with e2:
+            st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida, detalle paginado y página de trazabilidad.</p></div>", unsafe_allow_html=True)
+            st.download_button(
+                "Descargar PDF imprimible", pdf_bytes,
+                f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
+                "application/pdf", width="stretch",
+            )
+        with e3:
+            st.markdown("<div class='ch-card'><h3>📝 Informe para aprobación</h3><p>Metodología, resumen por grupo, fuentes y espacios para decisión y firmas manuscritas.</p></div>", unsafe_allow_html=True)
+            st.download_button(
+                "Descargar borrador de aprobación",
+                informe_aprobacion_bytes,
+                f"Informe_Aprobacion_Capital_Humano_{factor:.2f}x.pdf",
+                "application/pdf", width="stretch",
+            )
+        paquete_completo = crear_paquete_completo(
+            excel_bytes,
+            pdf_bytes,
             informe_aprobacion_bytes,
-            f"Informe_Aprobacion_Capital_Humano_{factor:.2f}x.pdf",
-            "application/pdf", width="stretch",
+            factor,
+            detalle_df,
+            st.session_state.get("revision_calidad_actual", revision_calidad_base),
+            manifiesto,
         )
-    st.caption(f"Versión {version_visible} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. El informe de aprobación permanece marcado como borrador hasta que se complete la revisión humana.")
+        st.subheader("Paquete completo para revisión")
+        st.caption("Incluye los tres documentos, parámetros del escenario, incidencias con revisión manual, manifiesto de fuentes y un inventario SHA-256 de todos los demás archivos del paquete.")
+        st.download_button(
+            "Descargar paquete completo (.zip)",
+            paquete_completo,
+            f"Paquete_Capital_Humano_{factor:.2f}x.zip",
+            "application/zip",
+            width="stretch",
+            key="descargar_paquete_completo",
+        )
+        st.caption(f"Versión {version_visible} · integridad verificada · el informe de aprobación permanece marcado como borrador.")
 
 elif vista == "Sistema y HTTPS":
     encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
