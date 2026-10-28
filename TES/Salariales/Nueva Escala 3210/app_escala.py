@@ -18,6 +18,7 @@ from fpdf import FPDF
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl.utils import get_column_letter
 
 CARPETA = Path(__file__).resolve().parent
 RAIZ_REPO = CARPETA.parents[2]
@@ -95,17 +96,18 @@ def crear_tablas(factor, propuesta, registros, anterior):
             "Fuente del salario": fuente,
         })
     detalle = []
-    for reg in registros:
+    for item_id, reg in enumerate(registros, start=1):
         base_salario = float(reg["salario"])
         tope = base_salario * base.FACTOR_MAXIMO_ABSOLUTO
         ajustado = base.aplicar_factor_con_tope(base_salario, factor)
         # Invariante de negocio: nunca superar seis veces el valor de origen.
         assert ajustado <= tope + 1e-9
         detalle.append({
-            "Hoja de origen": reg["hoja"],
-            "Fila de origen": reg["fila"],
-            "Cargo": reg["cargo"],
-            "Grupo propuesto": reg["grupo"],
+            "Id.": item_id,
+            "Hoja de origen": _texto_visible(reg.get("hoja")),
+            "Fila de origen": reg.get("fila"),
+            "Cargo": _texto_visible(reg.get("cargo")),
+            "Grupo propuesto": _texto_visible(reg.get("grupo")),
             "Salario original (CUP)": base_salario,
             "Factor aplicado": factor,
             "Tope máximo 6× (CUP)": tope,
@@ -131,7 +133,7 @@ def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b
     ws.merge_cells("A2:F2")
     ws.append(list(comparacion.columns))
     for fila in comparacion.itertuples(index=False, name=None):
-        ws.append(list(fila))
+        ws.append([None if _es_vacio(value) else value for value in fila])
     for cell in ws[1]:
         cell.fill = PatternFill("solid", fgColor=AZUL)
         cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
@@ -194,6 +196,23 @@ def crear_zip_csv_con_manifiesto(df: pd.DataFrame, csv_name: str, manifiesto: di
     return buffer.getvalue()
 
 
+def _es_vacio(value) -> bool:
+    """Detecta nulos y marcadores textuales de nulo para no imprimir `None`."""
+    if value is None:
+        return True
+    if isinstance(value, str) and value.strip().casefold() in {"none", "nan", "<na>"}:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def _texto_visible(value, por_defecto: str = "") -> str:
+    """Convierte datos ausentes en texto vacío o una etiqueta explícita."""
+    return por_defecto if _es_vacio(value) else str(value)
+
+
 def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
     wb = Workbook()
     ws = wb.active
@@ -203,17 +222,22 @@ def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, mani
     ws.append([f"Factor: {factor:.2f}× · Límite: 6× del salario fuente · Generado: {date.today():%d/%m/%Y}"])
     ws.append(list(escala.columns))
     for row in escala.itertuples(index=False, name=None):
-        ws.append(list(row))
-    _estilizar_hoja(ws, 3, len(escala) + 3, "TablaEscala", [12, 25, 26, 27, 16, 25, 24, 32])
+        ws.append([None if _es_vacio(value) else value for value in row])
+    ultima_columna_escala = get_column_letter(len(escala.columns))
+    _estilizar_hoja(
+        ws, 3, len(escala) + 3, "TablaEscala",
+        [12, 25, 26, 27, 16, 25, 24, 32],
+        money_cols={2, 3, 4, 6, 7}, factor_cols={5}, wrap_cols={8},
+    )
     ws.freeze_panes = "A4"
-    ws.auto_filter.ref = f"A3:H{len(escala) + 3}"
+    ws.auto_filter.ref = f"A3:{ultima_columna_escala}{len(escala) + 3}"
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.orientation = "landscape"
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 1
     ws.print_title_rows = "1:3"
-    ws.print_area = f"A1:H{len(escala)+3}"
+    ws.print_area = f"A1:{ultima_columna_escala}{len(escala)+3}"
 
     wd = wb.create_sheet("Plantilla Resolución 87")
     wd.sheet_view.showGridLines = False
@@ -221,24 +245,40 @@ def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, mani
     wd.append([f"Factor: {factor:.2f}× · Máximo permitido: 6× del salario original · Generado: {date.today():%d/%m/%Y}"])
     wd.append(list(detalle.columns))
     for row in detalle.itertuples(index=False, name=None):
-        wd.append(list(row))
-    _estilizar_hoja(wd, 3, len(detalle) + 3, "DetallePlantilla", [28, 14, 56, 18, 24, 17, 23, 25])
+        wd.append([None if _es_vacio(value) else value for value in row])
+    ultima_columna_detalle = get_column_letter(len(detalle.columns))
+    _estilizar_hoja(
+        wd, 3, len(detalle) + 3, "DetallePlantilla",
+        [9, 28, 11, 54, 18, 24, 13, 23, 25],
+        money_cols={6, 8, 9}, factor_cols={7}, wrap_cols={4},
+    )
     wd.freeze_panes = "A4"
-    wd.auto_filter.ref = f"A3:H{len(detalle) + 3}"
+    wd.auto_filter.ref = f"A3:{ultima_columna_detalle}{len(detalle) + 3}"
     wd.sheet_properties.pageSetUpPr.fitToPage = True
     wd.page_setup.orientation = "landscape"
     wd.page_setup.paperSize = wd.PAPERSIZE_A4
     wd.page_setup.fitToWidth = 1
     wd.page_setup.fitToHeight = 0
     wd.print_title_rows = "1:3"
-    wd.print_area = f"A1:H{len(detalle)+3}"
+    wd.print_area = f"A1:{ultima_columna_detalle}{len(detalle)+3}"
     agregar_hoja_trazabilidad(wb, manifiesto)
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
 
 
-def _estilizar_hoja(ws, header_row, last_row, table_name, widths):
+def _estilizar_hoja(
+    ws,
+    header_row,
+    last_row,
+    table_name,
+    widths,
+    *,
+    money_cols=(),
+    factor_cols=(),
+    wrap_cols=(),
+):
+    ultima_columna = get_column_letter(len(widths))
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(widths))
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(widths))
     for cell in ws[1]:
@@ -258,16 +298,18 @@ def _estilizar_hoja(ws, header_row, last_row, table_name, widths):
     for row in ws.iter_rows(min_row=header_row + 1, max_row=last_row):
         for cell in row:
             cell.border = Border(bottom=edge)
-            cell.alignment = Alignment(vertical="center", wrap_text=(cell.column == 3))
-            if cell.column in (2, 3, 4, 6, 7, 8) and isinstance(cell.value, (int, float)):
+            cell.alignment = Alignment(vertical="center", wrap_text=cell.column in wrap_cols)
+            if cell.column in money_cols and isinstance(cell.value, (int, float)):
                 cell.number_format = '"$"#,##0.00'
+            elif cell.column in factor_cols and isinstance(cell.value, (int, float)):
+                cell.number_format = '0.00"×"'
     if last_row > header_row:
-        tab = Table(displayName=table_name, ref=f"A{header_row}:H{last_row}")
+        tab = Table(displayName=table_name, ref=f"A{header_row}:{ultima_columna}{last_row}")
         tab.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True,
                                             showColumnStripes=False)
         ws.add_table(tab)
     for i, width in enumerate(widths, start=1):
-        ws.column_dimensions[chr(64+i)].width = width
+        ws.column_dimensions[get_column_letter(i)].width = width
 
 
 def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
@@ -288,7 +330,7 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
         pdf.cell(0, 6, subtitulo, new_x="LMARGIN", new_y="NEXT", align="C")
         pdf.ln(3)
 
-    def tabla(df, titulos, widths, money_cols, font_size=7.3):
+    def tabla(df, titulos, widths, money_cols, factor_cols=(), font_size=7.3):
         pdf.set_font("DejaVu", "B", font_size)
         pdf.set_fill_color(22, 134, 107)
         pdf.set_text_color(255, 255, 255)
@@ -312,41 +354,59 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
             pdf.set_font("DejaVu", "", font_size)
             height = 6
             for idx, (value, width) in enumerate(zip(row, widths)):
-                if isinstance(value, (int, float)) and idx in money_cols:
+                if _es_vacio(value):
+                    text = ""
+                elif isinstance(value, (int, float)) and idx in money_cols:
                     text = f"${value:,.2f}"
+                elif isinstance(value, (int, float)) and idx in factor_cols:
+                    text = f"{value:.2f}×"
                 elif isinstance(value, float):
-                    text = f"{value:.2f}×" if idx == 5 else f"{value:,.2f}"
+                    text = f"{value:,.2f}"
                 else:
                     text = str(value)
                 if len(text) > 52 and width < 55:
                     text = text[:49] + "…"
-                pdf.cell(width, height, text, border=1, align="R" if idx in money_cols else "L",
+                pdf.cell(width, height, text, border=1, align="R" if idx in money_cols or idx in factor_cols else "L",
                          fill=True, new_x="RIGHT", new_y="TOP")
             pdf.ln(height)
 
     pdf.add_page()
     cabecera("NUEVA ESCALA SALARIAL", f"Mínimo $3,210.00 · Factor de plantilla {factor:.2f}× · Tope absoluto 6× del salario base · CUP")
     cols = ["Grupo", "Anterior\nRes. 29/2020", "Oficial\nRes. 15/2026", "Base", "Factor", "Tope 6×", "Nueva propuesta", "Fuente"]
-    tabla(escala, cols, [14, 30, 30, 30, 18, 30, 31, 51], {1, 2, 3, 5, 6})
+    tabla(escala, cols, [14, 30, 30, 30, 18, 30, 31, 51], {1, 2, 3, 5, 6}, factor_cols={4})
     pdf.ln(2)
     pdf.set_font("DejaVu", "", 8)
     pdf.multi_cell(0, 4.5, "El grupo I conserva el salario mínimo oficial de $3,210.00. Los grupos sin propuesta de cargos conservan la escala oficial. La tabla detallada siguiente aplica el factor a cada salario de la plantilla fuente y limita cada resultado a seis veces ese salario.")
     pdf.add_page()
     cabecera("PLANTILLA PROPUESTA · DETALLE DE CARGOS", f"Fuente: propuesta de plantilla por la resolución 87.xls · {len(detalle)} cargos · Factor {factor:.2f}×")
-    det_cols = ["Hoja", "Fila", "Cargo", "Grupo", "Original", "Factor", "Tope 6×", "Ajustado"]
-    tabla(detalle, det_cols, [33, 12, 75, 15, 27, 17, 27, 28], {4, 6, 7}, font_size=6.8)
+    det_cols = ["Id.", "Hoja", "Fila", "Cargo", "Grupo", "Original", "Factor", "Tope 6×", "Ajustado"]
+    tabla(
+        detalle,
+        det_cols,
+        [10, 28, 12, 72, 15, 27, 17, 27, 28],
+        {5, 7, 8},
+        factor_cols={6},
+        font_size=6.8,
+    )
     pdf.add_page()
     estado_general = "INTEGRIDAD VERIFICADA" if manifiesto.get("integrity_ok") else "REVISIÓN REQUERIDA"
-    cabecera("TRAZABILIDAD DE FUENTES", f"Versión {manifiesto.get('application_version', 'desconocida')} · {estado_general}")
+    version = _texto_visible(manifiesto.get("application_version"), "desconocida")
+    checked_at = _texto_visible(manifiesto.get("checked_at_utc"), "No disponible")
+    cabecera("TRAZABILIDAD DE FUENTES", f"Versión {version} · {estado_general}")
     pdf.set_font("DejaVu", "", 8)
-    pdf.multi_cell(0, 4.5, f"Verificado en UTC: {manifiesto.get('checked_at_utc', 'No disponible')}\nLas huellas SHA-256 comparan los archivos actuales con el manifiesto versionado en docs/source_manifest.json. Coincidir no certifica autoría, firma digital ni vigencia jurídica de la fuente.")
+    pdf.multi_cell(0, 4.5, f"Verificado en UTC: {checked_at}\nLas huellas SHA-256 comparan los archivos actuales con el manifiesto versionado en docs/source_manifest.json. Coincidir no certifica autoría, firma digital ni vigencia jurídica de la fuente.")
     pdf.ln(2)
     for fuente in manifiesto.get("sources", []):
-        estado_fuente = fuente.get("status", "NO VERIFICADA")
+        estado_fuente = _texto_visible(fuente.get("status"), "NO VERIFICADA")
+        etiqueta = _texto_visible(fuente.get("label"), "Fuente sin etiqueta")
+        ruta = _texto_visible(fuente.get("path"), "no disponible")
+        hash_aprobado = _texto_visible(fuente.get("expected_sha256"), "no disponible")
+        hash_actual = _texto_visible(fuente.get("actual_sha256"), "no disponible")
+        tamano = _texto_visible(fuente.get("size_bytes"), "no disponible")
         pdf.set_font("DejaVu", "B", 8.5)
-        pdf.cell(0, 5, f"{fuente.get('label', 'Fuente')} · {estado_fuente}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 5, f"{etiqueta} · {estado_fuente}", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("DejaVu", "", 7)
-        pdf.multi_cell(0, 4, f"Ruta: {fuente.get('path', '')}\nSHA-256 aprobado: {fuente.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {fuente.get('actual_sha256', 'no disponible')} · Tamaño: {fuente.get('size_bytes', 'no disponible')} bytes")
+        pdf.multi_cell(0, 4, f"Ruta: {ruta}\nSHA-256 aprobado: {hash_aprobado}\nSHA-256 actual: {hash_actual} · Tamaño: {tamano} bytes")
         pdf.ln(1)
     if manifiesto.get("error"):
         pdf.set_font("DejaVu", "B", 8)
@@ -357,7 +417,7 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
         pdf.set_y(-9)
         pdf.set_font("DejaVu", "", 7)
         pdf.set_text_color(100, 110, 118)
-        pdf.cell(0, 5, f"Capital Humano · v{manifiesto.get('application_version', 'desconocida')} · {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
+        pdf.cell(0, 5, f"Capital Humano · v{version} · {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
     return bytes(pdf.output())
 
 
@@ -378,7 +438,7 @@ def crear_informe_aprobacion_pdf(
     pdf.subject = "Documento de trabajo pendiente de revisión y autorización humana"
     pdf.set_author("Capital Humano")
 
-    version = manifiesto.get("application_version", base.VERSION_APP)
+    version = _texto_visible(manifiesto.get("application_version"), base.VERSION_APP)
     integrity_ok = bool(manifiesto.get("integrity_ok"))
     integrity_label = "FUENTES VERIFICADAS" if integrity_ok else "REVISIÓN DE FUENTES REQUERIDA"
 
@@ -488,29 +548,40 @@ def crear_informe_aprobacion_pdf(
         "Una huella SHA-256 coincidente detecta igualdad de bytes frente al manifiesto; no es firma digital ni prueba vigencia o validez jurídica.",
     ):
         paragraph(f"- {assumption}", size=6.8, line_height=3.9)
-    if anomalias:
+    anomalias_visibles = [
+        _texto_visible(anomaly).strip()
+        for anomaly in (anomalias or [])
+        if not _es_vacio(anomaly) and _texto_visible(anomaly).strip()
+    ]
+    if anomalias_visibles:
         pdf.ln(1)
         heading("Incidencias observadas al extraer la fuente")
-        for anomaly in anomalias[:4]:
-            paragraph(f"• {str(anomaly)[:320]}", size=6.4, line_height=3.6)
-        if len(anomalias) > 4:
-            paragraph(f"• Se omiten {len(anomalias) - 4} incidencias adicionales en esta página.", size=6.4, line_height=3.6)
+        for anomaly in anomalias_visibles[:4]:
+            paragraph(f"- {anomaly[:320]}", size=6.4, line_height=3.6)
+        if len(anomalias_visibles) > 4:
+            paragraph(f"- Se omiten {len(anomalias_visibles) - 4} incidencias adicionales en esta página.", size=6.4, line_height=3.6)
     pdf.ln(2)
     heading("Fuentes supervisadas · hashes completos")
+    checked_at = _texto_visible(manifiesto.get("checked_at_utc"), "No disponible")
     paragraph(
-        f"Verificación UTC: {manifiesto.get('checked_at_utc', 'No disponible')}    ·    "
+        f"Verificación UTC: {checked_at}    ·    "
         "Los hashes aprobados se comparan con el contenido actual del repositorio.",
         size=6.2,
         line_height=3.8,
     )
     for source in manifiesto.get("sources", []):
-        status = source.get("status", "NO VERIFICADA")
+        source_id = _texto_visible(source.get("id"), "sin ID")
+        label = _texto_visible(source.get("label"), "Fuente sin etiqueta")
+        status = _texto_visible(source.get("status"), "NO VERIFICADA")
+        path = _texto_visible(source.get("path"), "no disponible")
+        expected_hash = _texto_visible(source.get("expected_sha256"), "no disponible")
+        actual_hash = _texto_visible(source.get("actual_sha256"), "no disponible")
         pdf.set_font("DejaVu", "B", 6.2)
         pdf.set_text_color(21, 50, 75)
-        pdf.cell(0, 4, f"{source.get('id', '')} · {source.get('label', '')} · {status}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 4, f"{source_id} · {label} · {status}", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("DejaVu", "", 5.0)
         pdf.set_text_color(35, 55, 70)
-        pdf.multi_cell(0, 3.3, f"Ruta: {source.get('path', '')}\nSHA-256 aprobado: {source.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {source.get('actual_sha256', 'no disponible')}")
+        pdf.multi_cell(0, 3.3, f"Ruta: {path}\nSHA-256 aprobado: {expected_hash}\nSHA-256 actual: {actual_hash}")
         pdf.ln(0.7)
     if manifiesto.get("error"):
         pdf.set_font("DejaVu", "B", 6.2)
@@ -625,6 +696,8 @@ except Exception as exc:
     st.stop()
 
 manifiesto = cargar_manifiesto()
+version_visible = _texto_visible(manifiesto.get("application_version"), base.VERSION_APP)
+fecha_verificacion_visible = _texto_visible(manifiesto.get("checked_at_utc"), "No disponible")
 if not manifiesto.get("integrity_ok"):
     st.warning(
         "La copia actual de una o más fuentes o archivos de cálculo no coincide con el manifiesto aprobado. "
@@ -679,6 +752,7 @@ def mostrar_tabla_detalle(tabla):
     st.dataframe(
         tabla, width="stretch", hide_index=True, height=560,
         column_config={
+            "Id.": st.column_config.NumberColumn(format="%.0f"),
             "Salario original (CUP)": st.column_config.NumberColumn(format="$%.2f"),
             "Tope máximo 6× (CUP)": st.column_config.NumberColumn(format="$%.2f"),
             "Salario ajustado (CUP)": st.column_config.NumberColumn(format="$%.2f"),
@@ -721,7 +795,7 @@ if vista == "Panel de control":
     with a1:
         st.markdown("<div class='ch-card'><h3>📊 Revisar escala</h3><p>Consulta los 32 grupos, salarios oficiales y propuesta ajustada.</p></div>", unsafe_allow_html=True)
     with a2:
-        st.markdown("<div class='ch-card'><h3>👥 Auditar plantilla</h3><p>Busca cargos, filtra por grupo y conserva hoja/fila de procedencia.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='ch-card'><h3>👥 Auditar plantilla</h3><p>Id. correlativo, búsqueda y filtros conservan la referencia a hoja y fila de origen.</p></div>", unsafe_allow_html=True)
     with a3:
         st.markdown("<div class='ch-card'><h3>📄 Preparar entregables</h3><p>Exporta el escenario activo a un libro Excel o PDF imprimible.</p></div>", unsafe_allow_html=True)
     if anomalias:
@@ -836,7 +910,7 @@ elif vista == "Exportaciones":
             f"Informe_Aprobacion_Capital_Humano_{factor:.2f}x.pdf",
             "application/pdf", width="stretch",
         )
-    st.caption(f"Versión {manifiesto.get('application_version', base.VERSION_APP)} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. El informe de aprobación permanece marcado como borrador hasta que se complete la revisión humana.")
+    st.caption(f"Versión {version_visible} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. El informe de aprobación permanece marcado como borrador hasta que se complete la revisión humana.")
 
 elif vista == "Sistema y HTTPS":
     encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
@@ -855,9 +929,9 @@ elif vista == "Sistema y HTTPS":
     q4.metric("Integridad SHA-256", "Verificada" if manifiesto.get("integrity_ok") else "Revisar")
     st.markdown("#### Información de ejecución")
     sys_df = pd.DataFrame([
-        {"Comprobación": "Versión de Capital Humano", "Resultado": manifiesto.get("application_version", base.VERSION_APP)},
+        {"Comprobación": "Versión de Capital Humano", "Resultado": version_visible},
         {"Comprobación": "Integridad de fuentes", "Resultado": "Verificada" if manifiesto.get("integrity_ok") else "Revisión requerida"},
-        {"Comprobación": "Verificación de fuentes (UTC)", "Resultado": manifiesto.get("checked_at_utc", "No disponible")},
+        {"Comprobación": "Verificación de fuentes (UTC)", "Resultado": fecha_verificacion_visible},
         {"Comprobación": "Sistema operativo", "Resultado": platform.platform()},
         {"Comprobación": "Python", "Resultado": sys.version.split()[0]},
         {"Comprobación": "Directorio de la aplicación", "Resultado": str(CARPETA)},
@@ -934,4 +1008,4 @@ elif vista == "Mejoras futuras":
     st.caption("Consulta criterios de aceptación y prioridades completas en la [hoja de ruta de Capital Humano](https://github.com/yhquintero/Capital_Humanos/blob/main/docs/ROADMAP.md). No adjuntes datos personales ni salarios reales a propuestas públicas de GitHub.")
 
 st.markdown("---")
-st.markdown(f"<div class='ch-muted'>Capital Humano · versión {manifiesto.get('application_version', base.VERSION_APP)} · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='ch-muted'>Capital Humano · versión {version_visible} · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)
