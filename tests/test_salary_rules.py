@@ -186,3 +186,44 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
     pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
     assert "TRAZABILIDAD DE FUENTES" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
+
+
+def test_approval_report_is_a_draft_with_methodology_hashes_and_signature_fields(app_namespace):
+    proposal, _, records, anomalies = payroll.extraer_propuesta_plantilla()
+    previous = payroll.cargar_salarios_res29()
+    scale, details = app_namespace["crear_tablas"](1.25, proposal, records, previous)
+    manifest = payroll.verificar_manifiesto_fuentes()
+    pdf_bytes = app_namespace["crear_informe_aprobacion_pdf"](
+        scale, details, 1.25, manifest, anomalies
+    )
+    reader = PdfReader(BytesIO(pdf_bytes))
+    report_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+    assert len(reader.pages) == 3
+    assert "INFORME DE METODOLOGÍA Y APROBACIÓN" in report_text
+    assert "BORRADOR" in report_text and "PENDIENTE DE REVISIÓN" in report_text
+    assert "Resolución 14/2026" in report_text and "Resolución 15/2026" in report_text
+    assert "XXXII" in report_text and "6×" in report_text
+    assert "No se calcula el impacto presupuestario total" in report_text
+    assert "SHA-256 aprobado" in report_text
+    for source in manifest["sources"]:
+        assert source["expected_sha256"] in report_text
+        assert source["actual_sha256"] in report_text
+    assert "PREPARÓ" in report_text and "REVISÓ" in report_text and "AUTORIZÓ" in report_text
+    assert "Firma manuscrita" in report_text
+    assert "Aprobar propuesta" in report_text
+
+    unverified = {
+        **manifest,
+        "integrity_ok": False,
+        "sources": [dict(source) for source in manifest["sources"]],
+    }
+    unverified["sources"][0]["status"] = "MODIFICADA"
+    unverified_pdf = app_namespace["crear_informe_aprobacion_pdf"](
+        scale, details, 1.25, unverified, anomalies
+    )
+    unverified_text = "\n".join(
+        page.extract_text() or "" for page in PdfReader(BytesIO(unverified_pdf)).pages
+    )
+    assert "REVISIÓN DE FUENTES REQUERIDA" in unverified_text
+    assert "MODIFICADA" in unverified_text

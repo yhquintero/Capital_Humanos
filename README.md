@@ -83,7 +83,7 @@ python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
 3. En **Escala salarial**, revisa los 32 grupos, sus importes y la metodología.
 4. En **Comparar escenarios**, contrasta dos multiplicadores en paralelo y exporta la tabla por grupo; no la interpretes como costo total de nómina.
 5. En **Plantilla por cargo**, filtra cargos y grupos y revisa las filas de origen.
-6. En **Exportaciones**, descarga el libro Excel o el PDF imprimible del escenario activo.
+6. En **Exportaciones**, descarga Excel, PDF detallado o el informe A4 para revisión/aprobación del escenario activo. El último es un borrador con campos manuales; no simula una autorización.
 7. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows; en **Mejoras futuras**, prioriza sugerencias que permanecen en el equipo.
 
 El control se aplica a cada salario propuesto de la plantilla; el tope se verifica por fila, no solo sobre un promedio o el total. Los grupos que no aparecen en la plantilla mantienen el valor oficial vigente, para no inventar salarios fuente inexistentes.
@@ -116,6 +116,7 @@ docs/HTTPS.md                         # despliegue TLS y gestión segura
 docs/source_manifest.json             # huellas aprobadas de fuentes y código
 tools/actualizar_manifiesto_fuentes.py # regenerar huellas tras revisión humana
 docs/TRAZABILIDAD_FUENTES.md          # política y límites de SHA-256
+docs/INFORME_APROBACION.md            # uso y límites del informe para aprobación
 ```
 
 ## 🧰 Tecnologías

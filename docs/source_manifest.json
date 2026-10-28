@@ -35,8 +35,8 @@
       "id": "interfaz_app",
       "label": "Código de la aplicación y exportadores",
       "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
-      "size_bytes": 40079,
-      "sha256": "a23da7c8ab2f8da01dc68cdadb8509874137c86b8fb1b8ad7f7587b591a6edae"
+      "size_bytes": 51698,
+      "sha256": "ee25477b30fad036b861ebc1f46f21922de217576a95200ed27b836a0d6421de"
     },
     {
       "id": "actualizador_manifest",

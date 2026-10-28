@@ -361,6 +361,233 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
     return bytes(pdf.output())
 
 
+def crear_informe_aprobacion_pdf(
+    escala: pd.DataFrame,
+    detalle: pd.DataFrame,
+    factor: float,
+    manifiesto: dict,
+    anomalias: list[str] | None = None,
+) -> bytes:
+    """Genera un informe de revisión imprimible, sin simular una aprobación."""
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.add_font("DejaVu", "", FUENTE)
+    pdf.add_font("DejaVu", "B", FUENTE_B)
+    pdf.set_auto_page_break(auto=True, margin=13)
+    pdf.set_margins(10, 10, 10)
+    pdf.title = "Informe de metodología y solicitud de aprobación"
+    pdf.subject = "Documento de trabajo pendiente de revisión y autorización humana"
+    pdf.set_author("Capital Humano")
+
+    version = manifiesto.get("application_version", base.VERSION_APP)
+    integrity_ok = bool(manifiesto.get("integrity_ok"))
+    integrity_label = "FUENTES VERIFICADAS" if integrity_ok else "REVISIÓN DE FUENTES REQUERIDA"
+
+    def heading(text: str) -> None:
+        pdf.set_font("DejaVu", "B", 10)
+        pdf.set_text_color(21, 50, 75)
+        pdf.cell(0, 6, text, new_x="LMARGIN", new_y="NEXT")
+
+    def paragraph(text: str, size: float = 7.2, line_height: float = 4.4) -> None:
+        pdf.set_font("DejaVu", "", size)
+        pdf.set_text_color(35, 55, 70)
+        pdf.multi_cell(0, line_height, text, new_x="LMARGIN", new_y="NEXT")
+
+    # Página 1: alcance, escenario y resumen agregado de los 32 grupos.
+    pdf.add_page()
+    pdf.set_y(13)
+    pdf.set_font("DejaVu", "B", 14)
+    pdf.set_text_color(21, 50, 75)
+    pdf.cell(0, 8, "INFORME DE METODOLOGÍA Y APROBACIÓN", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("DejaVu", "B", 8)
+    pdf.set_text_color(130, 77, 12)
+    pdf.set_fill_color(255, 243, 220)
+    pdf.cell(0, 7, "BORRADOR · PENDIENTE DE REVISIÓN Y APROBACIÓN HUMANA", border=1, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(3)
+    paragraph(
+        f"Fecha de generación: {date.today():%d/%m/%Y}    ·    Versión: {version}    ·    "
+        f"Factor seleccionado: {factor:.2f}×    ·    Cargos fuente: {len(detalle):,}    ·    "
+        f"Integridad: {integrity_label}",
+        size=7.6,
+        line_height=5,
+    )
+    pdf.ln(2)
+    heading("Propósito y alcance")
+    paragraph(
+        "Este documento resume un escenario de modelación para facilitar su revisión. No constituye una "
+        "resolución, decisión administrativa, autorización salarial ni estimación del gasto total de nómina. "
+        "La aplicación no dispone del número aprobado de plazas ocupadas y vacantes."
+    )
+    pdf.ln(1)
+    heading("Método aplicado")
+    paragraph(
+        "Para los grupos con cargos propuestos, el cálculo es min(salario de origen × factor, salario de origen × 6). "
+        "El factor seleccionado se aplica por cargo y nunca supera el límite absoluto de 6×. El grupo I conserva "
+        "el salario mínimo de la Resolución 14/2026 ($3,210.00 CUP); los grupos sin propuesta conservan la "
+        "escala oficial de la Resolución 15/2026 para 44 horas. Las firmas y la decisión se completan "
+        "manualmente en la página 3."
+    )
+    pdf.ln(2)
+    heading("Resumen por grupo · CUP")
+    pdf.set_font("DejaVu", "", 6.5)
+    pdf.set_text_color(80, 94, 104)
+    pdf.multi_cell(0, 3.8, "Base/ref. identifica el salario usado como referencia en cada grupo; la propuesta respeta el tope 6×.")
+    records = sorted(
+        escala.to_dict("records"),
+        key=lambda row: base.ROMANO_A_ENTERO.get(str(row.get("Grupo", "")), 999),
+    )
+    half = (len(records) + 1) // 2
+    widths = (15, 30, 15, 35, 15, 30, 15, 35)
+    headers = ("Grupo", "Base/ref.", "Factor", "Propuesta", "Grupo", "Base/ref.", "Factor", "Propuesta")
+    pdf.set_font("DejaVu", "B", 6.8)
+    pdf.set_fill_color(22, 134, 107)
+    pdf.set_text_color(255, 255, 255)
+    for title, width in zip(headers, widths):
+        pdf.cell(width, 7, title, border=1, align="C", fill=True, new_x="RIGHT", new_y="TOP")
+    pdf.ln(7)
+    pdf.set_font("DejaVu", "", 6.8)
+    pdf.set_text_color(25, 39, 49)
+    for index in range(half):
+        pair = (
+            records[index] if index < len(records) else None,
+            records[index + half] if index + half < len(records) else None,
+        )
+        for item in pair:
+            if item is None:
+                values = ("", "", "", "")
+            else:
+                values = (
+                    str(item["Grupo"]),
+                    f"${item['Base propuesta / referencia (CUP)']:,.2f}",
+                    f"{item['Factor aplicado']:.2f}×",
+                    f"${item['Nueva propuesta (CUP)']:,.2f}",
+                )
+            for value, width in zip(values, widths[:4]):
+                pdf.cell(width, 6.3, value, border=1, align="R" if value.startswith("$") else "C", new_x="RIGHT", new_y="TOP")
+        pdf.ln(6.3)
+    pdf.ln(2)
+    pdf.set_font("DejaVu", "B", 7)
+    pdf.set_text_color(130, 77, 12)
+    pdf.multi_cell(0, 4.2, "Antes de usar o distribuir: verificar las fuentes normativas, resolver discrepancias y completar la revisión y autorización institucional correspondientes.")
+
+    # Página 2: supuestos, incidencias detectadas y trazabilidad completa.
+    pdf.add_page()
+    pdf.set_y(13)
+    pdf.set_font("DejaVu", "B", 13)
+    pdf.set_text_color(21, 50, 75)
+    pdf.cell(0, 8, "METODOLOGÍA, SUPUESTOS Y TRAZABILIDAD", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("DejaVu", "B", 8)
+    pdf.set_text_color(130, 77, 12)
+    pdf.cell(0, 6, f"{integrity_label} · versión {version}", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    heading("Supuestos y límites")
+    for assumption in (
+        "La propuesta se extrae de la plantilla asociada a la Resolución 87; los salarios oficiales y referencias normativas deben ser confirmados por el área responsable.",
+        "Los grupos sin cargos propuestos no se multiplican: conservan la escala oficial de la Resolución 15/2026 (44 horas). El grupo I permanece en $3,210.00 CUP según la Resolución 14/2026.",
+        f"El factor usado en este escenario es {factor:.2f}×. Cada resultado propuesto queda limitado a seis veces su salario fuente.",
+        "No se calcula el impacto presupuestario total: no se dispone del conteo autorizado de plazas ocupadas/vacantes ni de componentes de nómina.",
+        "Una huella SHA-256 coincidente detecta igualdad de bytes frente al manifiesto; no es firma digital ni prueba vigencia o validez jurídica.",
+    ):
+        paragraph(f"- {assumption}", size=6.8, line_height=3.9)
+    if anomalias:
+        pdf.ln(1)
+        heading("Incidencias observadas al extraer la fuente")
+        for anomaly in anomalias[:4]:
+            paragraph(f"• {str(anomaly)[:320]}", size=6.4, line_height=3.6)
+        if len(anomalias) > 4:
+            paragraph(f"• Se omiten {len(anomalias) - 4} incidencias adicionales en esta página.", size=6.4, line_height=3.6)
+    pdf.ln(2)
+    heading("Fuentes supervisadas · hashes completos")
+    paragraph(
+        f"Verificación UTC: {manifiesto.get('checked_at_utc', 'No disponible')}    ·    "
+        "Los hashes aprobados se comparan con el contenido actual del repositorio.",
+        size=6.2,
+        line_height=3.8,
+    )
+    for source in manifiesto.get("sources", []):
+        status = source.get("status", "NO VERIFICADA")
+        pdf.set_font("DejaVu", "B", 6.2)
+        pdf.set_text_color(21, 50, 75)
+        pdf.cell(0, 4, f"{source.get('id', '')} · {source.get('label', '')} · {status}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("DejaVu", "", 5.0)
+        pdf.set_text_color(35, 55, 70)
+        pdf.multi_cell(0, 3.3, f"Ruta: {source.get('path', '')}\nSHA-256 aprobado: {source.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {source.get('actual_sha256', 'no disponible')}")
+        pdf.ln(0.7)
+    if manifiesto.get("error"):
+        pdf.set_font("DejaVu", "B", 6.2)
+        pdf.multi_cell(0, 3.8, f"Error de verificación: {str(manifiesto['error'])[:500]}")
+
+    # Página 3: espacios en blanco para una decisión humana documentada.
+    pdf.add_page()
+    pdf.set_y(13)
+    pdf.set_font("DejaVu", "B", 13)
+    pdf.set_text_color(21, 50, 75)
+    pdf.cell(0, 8, "REGISTRO DE REVISIÓN Y AUTORIZACIÓN", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("DejaVu", "B", 8)
+    pdf.set_text_color(130, 77, 12)
+    pdf.set_fill_color(255, 243, 220)
+    pdf.cell(0, 7, "BORRADOR · NO APROBADO · COMPLETAR MANUALMENTE", border=1, align="C", fill=True, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+    paragraph(
+        f"Escenario: factor {factor:.2f}× · Fecha del informe: {date.today():%d/%m/%Y} · "
+        f"Versión de la aplicación: {version} · Integridad de fuentes: {integrity_label}",
+        size=7.2,
+        line_height=4.4,
+    )
+    pdf.ln(4)
+    heading("Decisión (marcar una opción)")
+    pdf.set_font("DejaVu", "", 8)
+    pdf.set_text_color(35, 55, 70)
+    pdf.cell(0, 7, "[  ] Aprobar propuesta     [  ] Devolver para correcciones     [  ] No aprobar", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(3)
+    heading("Revisión mínima recomendada")
+    paragraph(
+        "[  ] Fuentes e integridad    [  ] Supuestos y metodología    [  ] Escala por grupo    "
+        "[  ] Incidencias y normativa vigente",
+        size=7.2,
+        line_height=4.4,
+    )
+    pdf.ln(5)
+    roles = ("PREPARÓ", "REVISÓ", "AUTORIZÓ")
+    role_width = 60
+    role_gap = 5
+    signature_y = pdf.get_y()
+    for index, role in enumerate(roles):
+        x = 10 + index * (role_width + role_gap)
+        y = signature_y
+        pdf.rect(x, y, role_width, 45)
+        pdf.set_xy(x + 2, y + 2)
+        pdf.set_font("DejaVu", "B", 7.5)
+        pdf.set_text_color(21, 50, 75)
+        pdf.cell(role_width - 4, 5, role, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_x(x + 2)
+        pdf.set_font("DejaVu", "", 6.5)
+        pdf.set_text_color(35, 55, 70)
+        pdf.multi_cell(role_width - 4, 7, "Nombre/cargo:\n\nFirma manuscrita:\n\nFecha:")
+    pdf.set_y(signature_y + 49)
+    heading("Observaciones, condiciones o referencias del acto de aprobación")
+    y_notes = pdf.get_y() + 1
+    pdf.rect(10, y_notes, 190, 54)
+    pdf.set_y(y_notes + 57)
+    pdf.set_font("DejaVu", "", 6.8)
+    pdf.set_text_color(100, 110, 118)
+    pdf.multi_cell(0, 4, "Las firmas deben ser realizadas por las personas facultadas conforme al procedimiento institucional. Este informe no contiene firmas electrónicas ni sustituye el acto administrativo que corresponda.")
+
+    pdf.alias_nb_pages()
+    pdf.set_auto_page_break(auto=False)
+    for page_number in range(1, pdf.page_no() + 1):
+        pdf.page = page_number
+        pdf.set_y(-10)
+        pdf.set_font("DejaVu", "", 6.5)
+        pdf.set_text_color(100, 110, 118)
+        pdf.cell(
+            0,
+            5,
+            f"Capital Humano · v{version} · BORRADOR PARA REVISIÓN · Página {page_number} de {{nb}}",
+            align="C",
+        )
+    return bytes(pdf.output())
+
+
 # ---- Interfaz profesional / panel de control -------------------------------
 NAV = [
     "Panel de control",
@@ -578,13 +805,16 @@ elif vista == "Plantilla por cargo":
 elif vista == "Exportaciones":
     encabezado("Exportar y presentar", "Genera documentos consistentes con el escenario mostrado en el panel.")
     st.write(f"**Escenario activo:** {factor:.2f}× · **Cargos:** {len(detalle_df)} · **Fecha:** {date.today():%d/%m/%Y}")
-    st.info("El Excel y el PDF incluyen una hoja/página de trazabilidad SHA-256 con la versión de la app y el estado de las fuentes.")
+    st.info("El Excel y el PDF detallado incluyen trazabilidad SHA-256. El informe de aprobación es un borrador imprimible con metodología, resumen por grupo y campos para revisión humana.")
     with st.spinner("Preparando los archivos para descarga…"):
         excel_bytes = crear_excel(escala_df, detalle_df, factor, manifiesto)
         pdf_bytes = crear_pdf(escala_df, detalle_df, factor, manifiesto)
-    e1, e2 = st.columns(2)
+        informe_aprobacion_bytes = crear_informe_aprobacion_pdf(
+            escala_df, detalle_df, factor, manifiesto, anomalias
+        )
+    e1, e2, e3 = st.columns(3)
     with e1:
-        st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, fórmulas/formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
         st.download_button(
             "Descargar Excel (.xlsx)", excel_bytes,
             f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
@@ -592,13 +822,21 @@ elif vista == "Exportaciones":
             width="stretch",
         )
     with e2:
-        st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida y listado paginado de cargos, listo para imprimir.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida, detalle paginado y página de trazabilidad.</p></div>", unsafe_allow_html=True)
         st.download_button(
             "Descargar PDF imprimible", pdf_bytes,
             f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
             "application/pdf", width="stretch",
         )
-    st.caption(f"Versión {manifiesto.get('application_version', base.VERSION_APP)} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. Antes de distribuir, confirma el factor aprobado y la normativa vigente.")
+    with e3:
+        st.markdown("<div class='ch-card'><h3>📝 Informe para aprobación</h3><p>Metodología, resumen por grupo, fuentes y espacios para decisión y firmas manuscritas.</p></div>", unsafe_allow_html=True)
+        st.download_button(
+            "Descargar borrador de aprobación",
+            informe_aprobacion_bytes,
+            f"Informe_Aprobacion_Capital_Humano_{factor:.2f}x.pdf",
+            "application/pdf", width="stretch",
+        )
+    st.caption(f"Versión {manifiesto.get('application_version', base.VERSION_APP)} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. El informe de aprobación permanece marcado como borrador hasta que se complete la revisión humana.")
 
 elif vista == "Sistema y HTTPS":
     encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
