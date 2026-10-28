@@ -10,9 +10,11 @@ Herramienta Python para recalcular la escala salarial y preparar una propuesta i
 - Mínimo del grupo I fijado en **$3,210.00 CUP** (Res. 14/2026).
 - Grupos con propuesta recalculados; los demás conservan la escala oficial Res. 15/2026 (44 h).
 - Comparación de dos escenarios simultáneos, por grupo, con exportación CSV/Excel.
-- Exportación de la escala activa a **Excel `.xlsx`** y **PDF A4 horizontal** listo para imprimir.
+- Exportación de la escala activa a **Excel `.xlsx`** y **PDF A4 horizontal** con página de trazabilidad.
+- SHA-256 y versión de app en los informes; las descargas CSV incluyen el manifiesto JSON dentro del ZIP.
+- Validación de integridad de plantilla, escala histórica, Gaceta Oficial y módulos de cálculo.
 - Trazabilidad por hoja y fila de origen del libro `.xls`.
-- Pruebas automáticas de reglas de cálculo, fuentes y navegación Streamlit en GitHub Actions.
+- Pruebas automáticas de reglas, fuentes y navegación Streamlit en GitHub Actions.
 
 ## Windows PowerShell · instalación recomendada
 
@@ -118,3 +120,5 @@ python -m pip install -r requirements.txt
 - `propuesta de plantilla por la resolucion 87.xls`: cargos y salarios de origen.
 
 El tope se verifica por cargo: `salario ajustado ≤ salario original × 6`. Los cargos sin salario propuesto conservan el salario oficial y el grupo I permanece anclado en $3,210.00. Dos discrepancias de origen aparecen en los grupos XII y XV; la interfaz mantiene el detalle por fila para su revisión. Validar cualquier propuesta antes de aprobarla.
+
+Para entender o actualizar las huellas SHA-256 de las fuentes, sigue la [guía de trazabilidad](../../../docs/TRAZABILIDAD_FUENTES.md). No regeneres el manifiesto para silenciar una discrepancia que no haya sido revisada.

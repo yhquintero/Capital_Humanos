@@ -1,0 +1,49 @@
+{
+  "manifest_schema": 1,
+  "application_version": "0.1.0-dev",
+  "algorithm": "SHA-256",
+  "sources": [
+    {
+      "id": "plantilla_res87",
+      "label": "Plantilla de cargos · propuesta Resolución 87",
+      "path": "Nueva Estructura de Plantilla/Organigrama/propuesta de plantilla por la resolucion 87.xls",
+      "size_bytes": 2780672,
+      "sha256": "02399d1abf33cb821829df57f146e9011488ed86a11e539c664a2114c7b8b6cc"
+    },
+    {
+      "id": "escala_res29",
+      "label": "Escala histórica · Resolución 29/2020",
+      "path": "TES/Salariales/Escala 3210_OK.xlsx",
+      "size_bytes": 13968,
+      "sha256": "fbf1764dd6d77a5845dbbd01a7453e119915feb798dc7b43f25e431f67217d01"
+    },
+    {
+      "id": "gaceta_2026",
+      "label": "Gaceta Oficial · Resoluciones 14/2026 y 15/2026",
+      "path": "TES/Salariales/goc-2026-o60.pdf",
+      "size_bytes": 1104320,
+      "sha256": "7dfe261ae1db5de5ceee1e9ebe141693a5a1ca474809158960c6bd94a2c0a1e1"
+    },
+    {
+      "id": "motor_calculo",
+      "label": "Código de extracción y cálculo",
+      "path": "TES/Salariales/Nueva Escala 3210/generar_escala.py",
+      "size_bytes": 37562,
+      "sha256": "c41ad5dfcdabc308705d391cca7309377ba1dd7ec855c06bfe49b28a32c272e8"
+    },
+    {
+      "id": "interfaz_app",
+      "label": "Código de la aplicación y exportadores",
+      "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
+      "size_bytes": 39479,
+      "sha256": "710421e5c5d23bf9ab5626b37c60f164720012678a82454c98fad5aa0ac900cb"
+    },
+    {
+      "id": "actualizador_manifest",
+      "label": "Herramienta de actualización del manifiesto",
+      "path": "tools/actualizar_manifiesto_fuentes.py",
+      "size_bytes": 865,
+      "sha256": "6b820ded8d9c01129c0d5fbfa223e43039be6126db75809c15d5ea675f2c5e85"
+    }
+  ]
+}

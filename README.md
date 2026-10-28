@@ -26,7 +26,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 - Aplica un control explícito: **el salario ajustado no puede superar 6× el salario base del cargo en la plantilla fuente**.
 - Mantiene anclado el **grupo I en $3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
 - Incluye un panel ejecutivo, auditoría filtrable por cargo, comparación de dos escenarios (por grupo, CSV/Excel), diagnóstico de fuentes/HTTPS y priorización de futuras mejoras.
-- Exporta la escala y el detalle de todos los cargos a **Excel (.xlsx)** y a **PDF A4 horizontal listo para imprimir**.
+- Exporta escala, detalle y trazabilidad SHA-256 a **Excel (.xlsx)** y **PDF A4 horizontal**; las exportaciones CSV incluyen un manifiesto JSON en el ZIP.
 
 ## 🚀 Inicio rápido
 
@@ -113,6 +113,9 @@ TES/Salariales/Nueva Escala 3210/
 Dockerfile                            # contenedor Streamlit no-root
 deploy/                               # Caddy + Let's Encrypt + acceso protegido
 docs/HTTPS.md                         # despliegue TLS y gestión segura
+docs/source_manifest.json             # huellas aprobadas de fuentes y código
+tools/actualizar_manifiesto_fuentes.py # regenerar huellas tras revisión humana
+docs/TRAZABILIDAD_FUENTES.md          # política y límites de SHA-256
 ```
 
 ## 🧰 Tecnologías
@@ -125,7 +128,7 @@ docs/HTTPS.md                         # despliegue TLS y gestión segura
 
 ## 🗺️ Hoja de ruta y contribuciones
 
-Las mejoras se priorizan con beneficio, esfuerzo y criterios de aceptación explícitos; no se proclama una mejora como terminada sin pruebas. Revisa la [hoja de ruta](docs/ROADMAP.md), el [tablero de propuestas](docs/MEJORAS_PROPUESTAS.md) y el [registro de cambios](CHANGELOG.md). GitHub ofrece formularios para reportar fallos y sugerir opciones sin adjuntar datos personales ni salarios reales.
+Las mejoras se priorizan con beneficio, esfuerzo y criterios de aceptación explícitos; no se proclama una mejora como terminada sin pruebas. Revisa la [hoja de ruta](docs/ROADMAP.md), el [tablero de propuestas](docs/MEJORAS_PROPUESTAS.md), la [guía de trazabilidad SHA-256](docs/TRAZABILIDAD_FUENTES.md) y el [registro de cambios](CHANGELOG.md). GitHub ofrece formularios para reportar fallos y sugerir opciones sin adjuntar datos personales ni salarios reales.
 
 Para ejecutar la suite localmente:
 

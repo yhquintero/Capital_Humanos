@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import platform
 import sys
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -48,6 +50,10 @@ def cargar_datos():
     propuesta, contadores, registros, anomalias = base.extraer_propuesta_plantilla()
     anterior = base.cargar_salarios_res29()
     return propuesta, contadores, registros, anomalias, anterior
+
+
+def cargar_manifiesto():
+    return base.manifiesto_para_salida()
 
 
 def crear_tablas(factor, propuesta, registros, anterior):
@@ -101,7 +107,7 @@ def crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior):
     return pd.DataFrame(base.comparar_escenarios(factor_a, factor_b, propuesta, anterior))
 
 
-def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b: float) -> bytes:
+def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b: float, manifiesto: dict) -> bytes:
     """Crea un Excel de comparación, listo para filtrar e imprimir en A4."""
     wb = Workbook()
     ws = wb.active
@@ -149,12 +155,34 @@ def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b
     ws.page_setup.fitToHeight = 1
     ws.print_title_rows = "1:3"
     ws.print_area = f"A1:F{ws.max_row}"
+    agregar_hoja_trazabilidad(wb, manifiesto)
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
 
 
-def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> bytes:
+def agregar_hoja_trazabilidad(wb: Workbook, manifiesto: dict) -> None:
+    """Añade la hoja de trazabilidad compartida con el generador de cálculos."""
+    base.agregar_hoja_trazabilidad(wb, manifiesto)
+
+
+def crear_zip_csv_con_manifiesto(df: pd.DataFrame, csv_name: str, manifiesto: dict) -> bytes:
+    """Entrega el CSV intacto junto a su manifiesto legible en un ZIP."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(csv_name, df.to_csv(index=False).encode("utf-8-sig"))
+        archive.writestr(
+            "manifiesto_fuentes.json",
+            json.dumps(manifiesto, ensure_ascii=False, indent=2).encode("utf-8"),
+        )
+        archive.writestr(
+            "LEEME.txt",
+            "El CSV conserva sus filas y columnas. El manifiesto JSON identifica las fuentes y compara los hashes observados con los aprobados en el repositorio. SHA-256 detecta diferencias de bytes; no es firma digital ni certificación normativa.\n",
+        )
+    return buffer.getvalue()
+
+
+def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Escala interactiva"
@@ -192,6 +220,7 @@ def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> b
     wd.page_setup.fitToHeight = 0
     wd.print_title_rows = "1:3"
     wd.print_area = f"A1:H{len(detalle)+3}"
+    agregar_hoja_trazabilidad(wb, manifiesto)
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -229,7 +258,7 @@ def _estilizar_hoja(ws, header_row, last_row, table_name, widths):
         ws.column_dimensions[chr(64+i)].width = width
 
 
-def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> bytes:
+def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
     pdf = FPDF(orientation="L", unit="mm", format="A4")
     pdf.add_font("DejaVu", "", FUENTE)
     pdf.add_font("DejaVu", "B", FUENTE_B)
@@ -294,13 +323,29 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> byt
     cabecera("PLANTILLA PROPUESTA · DETALLE DE CARGOS", f"Fuente: propuesta de plantilla por la resolución 87.xls · {len(detalle)} cargos · Factor {factor:.2f}×")
     det_cols = ["Hoja", "Fila", "Cargo", "Grupo", "Original", "Factor", "Tope 6×", "Ajustado"]
     tabla(detalle, det_cols, [33, 12, 75, 15, 27, 17, 27, 28], {4, 6, 7}, font_size=6.8)
+    pdf.add_page()
+    estado_general = "INTEGRIDAD VERIFICADA" if manifiesto.get("integrity_ok") else "REVISIÓN REQUERIDA"
+    cabecera("TRAZABILIDAD DE FUENTES", f"Versión {manifiesto.get('application_version', 'desconocida')} · {estado_general}")
+    pdf.set_font("DejaVu", "", 8)
+    pdf.multi_cell(0, 4.5, f"Verificado en UTC: {manifiesto.get('checked_at_utc', 'No disponible')}\nLas huellas SHA-256 comparan los archivos actuales con el manifiesto versionado en docs/source_manifest.json. Coincidir no certifica autoría, firma digital ni vigencia jurídica de la fuente.")
+    pdf.ln(2)
+    for fuente in manifiesto.get("sources", []):
+        estado_fuente = fuente.get("status", "NO VERIFICADA")
+        pdf.set_font("DejaVu", "B", 8.5)
+        pdf.cell(0, 5, f"{fuente.get('label', 'Fuente')} · {estado_fuente}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("DejaVu", "", 7)
+        pdf.multi_cell(0, 4, f"Ruta: {fuente.get('path', '')}\nSHA-256 aprobado: {fuente.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {fuente.get('actual_sha256', 'no disponible')} · Tamaño: {fuente.get('size_bytes', 'no disponible')} bytes")
+        pdf.ln(1)
+    if manifiesto.get("error"):
+        pdf.set_font("DejaVu", "B", 8)
+        pdf.multi_cell(0, 4, f"Error al verificar el manifiesto: {manifiesto['error']}")
     pdf.alias_nb_pages()
     for n in range(1, pdf.page_no() + 1):
         pdf.page = n
         pdf.set_y(-9)
         pdf.set_font("DejaVu", "", 7)
         pdf.set_text_color(100, 110, 118)
-        pdf.cell(0, 5, f"Capital Humano · generado {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
+        pdf.cell(0, 5, f"Capital Humano · v{manifiesto.get('application_version', 'desconocida')} · {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
     return bytes(pdf.output())
 
 
@@ -339,6 +384,14 @@ except Exception as exc:
     st.error(f"No se pudo cargar la plantilla de origen: {exc}")
     st.info("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.")
     st.stop()
+
+manifiesto = cargar_manifiesto()
+if not manifiesto.get("integrity_ok"):
+    st.warning(
+        "La copia actual de una o más fuentes o archivos de cálculo no coincide con el manifiesto aprobado. "
+        "Revisa la sección Sistema y HTTPS y no distribuyas los informes hasta validar el cambio.",
+        icon="⚠️",
+    )
 
 with st.sidebar:
     st.markdown("<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#667b89;font-size:.83rem'>Panel de Escala Salarial</div></div>", unsafe_allow_html=True)
@@ -451,7 +504,7 @@ elif vista == "Escala salarial":
         """)
 
 elif vista == "Comparar escenarios":
-    encabezado("Comparar escenarios", "Contrasta dos factores en paralelo y revisa la diferencia salarial por grupo antes de decidir.")
+    encabezado("Comparar escenarios", "Contrasta dos factores en paralelo, revisa diferencias por grupo y conserva la trazabilidad del archivo exportado.")
     ca, cb = st.columns(2)
     factor_a = ca.slider("Escenario A · factor", 1.0, 6.0, 1.0, 0.05, format="%.2f×", key="comparador_a")
     factor_b = cb.slider("Escenario B · factor", 1.0, 6.0, 1.5, 0.05, format="%.2f×", key="comparador_b")
@@ -475,11 +528,11 @@ elif vista == "Comparar escenarios":
     )
     st.warning("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina.")
     out_csv, out_xlsx = st.columns(2)
-    csv_comparacion = comparacion_df.to_csv(index=False).encode("utf-8-sig")
+    csv_comparacion = crear_zip_csv_con_manifiesto(comparacion_df, "Comparacion_escenarios_Capital_Humano.csv", manifiesto)
     with out_csv:
-        st.download_button("Descargar comparación CSV", csv_comparacion, "Comparacion_escenarios_Capital_Humano.csv", "text/csv", width="stretch")
+        st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_Capital_Humano.zip", "application/zip", width="stretch")
     with out_xlsx:
-        xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b)
+        xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b, manifiesto)
         st.download_button(
             "Descargar comparación Excel", xlsx_comparacion,
             f"Comparacion_escenarios_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
@@ -507,16 +560,16 @@ elif vista == "Plantilla por cargo":
     m2.metric("Salario fuente total", f"${filtrada['Salario original (CUP)'].sum():,.2f}")
     m3.metric("Propuesta calculada", f"${filtrada['Salario ajustado (CUP)'].sum():,.2f}")
     mostrar_tabla_detalle(filtrada)
-    csv = filtrada.to_csv(index=False).encode("utf-8-sig")
-    st.download_button("Descargar este filtro en CSV", csv, "Plantilla_Resolucion87_filtrada.csv", "text/csv")
+    csv = crear_zip_csv_con_manifiesto(filtrada, "Plantilla_Resolucion87_filtrada.csv", manifiesto)
+    st.download_button("Descargar filtro CSV + manifiesto (.zip)", csv, "Plantilla_Resolucion87_filtrada.zip", "application/zip")
 
 elif vista == "Exportaciones":
     encabezado("Exportar y presentar", "Genera documentos consistentes con el escenario mostrado en el panel.")
     st.write(f"**Escenario activo:** {factor:.2f}× · **Cargos:** {len(detalle_df)} · **Fecha:** {date.today():%d/%m/%Y}")
-    st.info("El Excel incluye hojas de escala y detalle auditable. El PDF presenta ambas tablas en páginas A4 horizontales.")
+    st.info("El Excel y el PDF incluyen una hoja/página de trazabilidad SHA-256 con la versión de la app y el estado de las fuentes.")
     with st.spinner("Preparando los archivos para descarga…"):
-        excel_bytes = crear_excel(escala_df, detalle_df, factor)
-        pdf_bytes = crear_pdf(escala_df, detalle_df, factor)
+        excel_bytes = crear_excel(escala_df, detalle_df, factor, manifiesto)
+        pdf_bytes = crear_pdf(escala_df, detalle_df, factor, manifiesto)
     e1, e2 = st.columns(2)
     with e1:
         st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, fórmulas/formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
@@ -533,7 +586,7 @@ elif vista == "Exportaciones":
             f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
             "application/pdf", width="stretch",
         )
-    st.caption("Consejo: antes de distribuir, revisa discrepancias en el origen y confirma el factor aprobado.")
+    st.caption(f"Versión {manifiesto.get('application_version', base.VERSION_APP)} · integridad: {'verificada' if manifiesto.get('integrity_ok') else 'revisión requerida'}. Antes de distribuir, confirma el factor aprobado y la normativa vigente.")
 
 elif vista == "Sistema y HTTPS":
     encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
@@ -545,12 +598,16 @@ elif vista == "Sistema y HTTPS":
     proxy_tls = request_headers.get("x-forwarded-proto", "").lower() == "https"
     cert_file_ok = bool(ssl_cert and Path(ssl_cert).is_file())
     tls_state = "HTTPS confirmado por proxy" if proxy_tls else ("Certificado TLS nativo configurado" if cert_file_ok else "No confirmado por esta sesión")
-    q1, q2, q3 = st.columns(3)
+    q1, q2, q3, q4 = st.columns(4)
     q1.metric("Canal", tls_state)
     q2.metric("Plantilla fuente", "Disponible" if base.RUTA_PLANTILLA.is_file() else "No encontrada")
     q3.metric("Escala histórica", "Disponible" if base.RUTA_ESCALA_BASE.is_file() else "No encontrada")
+    q4.metric("Integridad SHA-256", "Verificada" if manifiesto.get("integrity_ok") else "Revisar")
     st.markdown("#### Información de ejecución")
     sys_df = pd.DataFrame([
+        {"Comprobación": "Versión de Capital Humano", "Resultado": manifiesto.get("application_version", base.VERSION_APP)},
+        {"Comprobación": "Integridad de fuentes", "Resultado": "Verificada" if manifiesto.get("integrity_ok") else "Revisión requerida"},
+        {"Comprobación": "Verificación de fuentes (UTC)", "Resultado": manifiesto.get("checked_at_utc", "No disponible")},
         {"Comprobación": "Sistema operativo", "Resultado": platform.platform()},
         {"Comprobación": "Python", "Resultado": sys.version.split()[0]},
         {"Comprobación": "Directorio de la aplicación", "Resultado": str(CARPETA)},
@@ -559,6 +616,24 @@ elif vista == "Sistema y HTTPS":
         {"Comprobación": "Validación de tope 6×", "Resultado": "Correcta" if detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all() else "Revisar"},
     ])
     st.dataframe(sys_df, width="stretch", hide_index=True)
+    st.markdown("#### Huellas SHA-256 de fuentes y código")
+    if manifiesto.get("integrity_ok"):
+        st.success("Todos los archivos supervisados coinciden byte a byte con las huellas aprobadas del manifiesto.")
+    else:
+        st.error("Una fuente, el manifiesto o el código no coincide con la versión registrada; valida el cambio antes de distribuir informes.")
+        if manifiesto.get("error"):
+            st.caption(manifiesto["error"])
+    manifest_df = pd.DataFrame(manifiesto.get("sources", []))
+    if not manifest_df.empty:
+        st.dataframe(
+            manifest_df, width="stretch", hide_index=True,
+            column_config={
+                "expected_sha256": st.column_config.TextColumn("SHA-256 aprobado", width="large"),
+                "actual_sha256": st.column_config.TextColumn("SHA-256 actual", width="large"),
+                "size_bytes": st.column_config.NumberColumn("Tamaño (bytes)", format="localized"),
+            },
+        )
+    st.caption("Para actualizar el manifiesto tras un cambio autorizado, revisa primero la nueva fuente y ejecuta: python tools/actualizar_manifiesto_fuentes.py. El hash no sustituye revisión normativa ni firma digital.")
     st.warning("HTTPS cifra y autentica el servidor; no sustituye controles de acceso a nivel de aplicación. Para uso público, usa Caddy + Let's Encrypt y autenticación Basic configurada en el despliegue. No expongas directamente el puerto 8501.")
     if os.name == "nt":
         control_script = CARPETA / "control_app.ps1"
@@ -595,7 +670,7 @@ elif vista == "Mejoras futuras":
         "Indicadores de nómina a partir de plazas autorizadas y verificadas",
         "Mejoras de accesibilidad y experiencia móvil (WCAG)",
         "Interfaz en inglés con referencias legales cubanas intactas",
-        "Huella verificable de fuentes en los informes descargados",
+        "Firma digital verificable de releases e informes con claves protegidas",
     ]
     seleccionadas = st.multiselect("¿Qué mejoras priorizarías?", opciones, placeholder="Selecciona una o varias")
     prioridad = st.select_slider("Prioridad global", options=["Baja", "Media", "Alta", "Urgente"], value="Media")
@@ -609,4 +684,4 @@ elif vista == "Mejoras futuras":
     st.caption("Consulta criterios de aceptación y prioridades completas en la [hoja de ruta de Capital Humano](https://github.com/yhquintero/Capital_Humanos/blob/main/docs/ROADMAP.md). No adjuntes datos personales ni salarios reales a propuestas públicas de GitHub.")
 
 st.markdown("---")
-st.markdown("<div class='ch-muted'>Capital Humano · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='ch-muted'>Capital Humano · versión {manifiesto.get('application_version', base.VERSION_APP)} · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)

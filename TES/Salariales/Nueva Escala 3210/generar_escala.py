@@ -14,8 +14,8 @@
       tabla de 44 horas semanales, incorporada como constante citada.
 
  Salidas (en esta misma carpeta):
-   - Escala_Salarial_3210_Nueva.xlsx   (4 hojas, con fórmulas y formato)
-   - Escala_Salarial_3210_Nueva.pdf    (tabla ejecutiva, A4 horizontal)
+   - Escala_Salarial_3210_Nueva.xlsx   (5 hojas, con trazabilidad SHA-256)
+   - Escala_Salarial_3210_Nueva.pdf    (informe A4 horizontal y trazabilidad)
 
  Requisitos:  pip install xlrd openpyxl fpdf2
  (entorno virtual recomendado)
@@ -25,6 +25,8 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 import math
 import os
 from collections import Counter, defaultdict
@@ -34,6 +36,7 @@ import xlrd
 from fpdf import FPDF
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.table import Table, TableStyleInfo
 from openpyxl.utils import get_column_letter
 
 # ---------------------------------------------------------------------------
@@ -48,6 +51,20 @@ RUTA_PLANTILLA = RAIZ_REPO / (
 RUTA_ESCALA_BASE = CARPETA.parent / "Escala 3210_OK.xlsx"
 SALIDA_XLSX = CARPETA / "Escala_Salarial_3210_Nueva.xlsx"
 SALIDA_PDF = CARPETA / "Escala_Salarial_3210_Nueva.pdf"
+RUTA_MANIFIESTO_FUENTES = RAIZ_REPO / "docs" / "source_manifest.json"
+VERSION_APP = "0.1.0-dev"
+FUENTES_CONTROLADAS = (
+    (
+        "plantilla_res87",
+        "Plantilla de cargos · propuesta Resolución 87",
+        "Nueva Estructura de Plantilla/Organigrama/propuesta de plantilla por la resolucion 87.xls",
+    ),
+    ("escala_res29", "Escala histórica · Resolución 29/2020", "TES/Salariales/Escala 3210_OK.xlsx"),
+    ("gaceta_2026", "Gaceta Oficial · Resoluciones 14/2026 y 15/2026", "TES/Salariales/goc-2026-o60.pdf"),
+    ("motor_calculo", "Código de extracción y cálculo", "TES/Salariales/Nueva Escala 3210/generar_escala.py"),
+    ("interfaz_app", "Código de la aplicación y exportadores", "TES/Salariales/Nueva Escala 3210/app_escala.py"),
+    ("actualizador_manifest", "Herramienta de actualización del manifiesto", "tools/actualizar_manifiesto_fuentes.py"),
+)
 
 GRUPOS_ROMANOS = [
     "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X",
@@ -97,6 +114,161 @@ def aplicar_factor_con_tope(salario_base: float, factor: float) -> float:
     if not math.isfinite(multiplicador) or not 0 <= multiplicador <= FACTOR_MAXIMO_ABSOLUTO:
         raise ValueError(f"El factor debe estar entre 0× y {FACTOR_MAXIMO_ABSOLUTO:g}×.")
     return min(salario * multiplicador, salario * FACTOR_MAXIMO_ABSOLUTO)
+
+
+def _sha256(path: Path) -> str:
+    """Calcula SHA-256 en bloques para no cargar archivos grandes en memoria."""
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def crear_manifiesto_fuentes(root: Path = RAIZ_REPO) -> dict:
+    """Crea el manifiesto de las entradas y del código que gobierna el cálculo."""
+    root = Path(root).resolve()
+    entries = []
+    for source_id, label, relative_path in FUENTES_CONTROLADAS:
+        file_path = root / relative_path
+        if not file_path.is_file():
+            raise FileNotFoundError(f"No se encontró la fuente que se va a registrar: {relative_path}")
+        entries.append({
+            "id": source_id,
+            "label": label,
+            "path": relative_path,
+            "size_bytes": file_path.stat().st_size,
+            "sha256": _sha256(file_path),
+        })
+    return {
+        "manifest_schema": 1,
+        "application_version": VERSION_APP,
+        "algorithm": "SHA-256",
+        "sources": entries,
+    }
+
+
+def verificar_manifiesto_fuentes(manifest_path: Path = RUTA_MANIFIESTO_FUENTES, root: Path = RAIZ_REPO) -> dict:
+    """Compara los bytes actuales con las huellas aprobadas y reporta cualquier cambio."""
+    manifest_path = Path(manifest_path)
+    root = Path(root).resolve()
+    approved = json.loads(manifest_path.read_text(encoding="utf-8"))
+    approved_sources = {item["id"]: item for item in approved.get("sources", [])}
+    actual_sources = []
+    for source_id, label, relative_path in FUENTES_CONTROLADAS:
+        expected = approved_sources.get(source_id, {})
+        file_path = root / relative_path
+        if not file_path.is_file():
+            actual_sources.append({
+                "id": source_id, "label": label, "path": relative_path,
+                "expected_sha256": expected.get("sha256", ""),
+                "actual_sha256": "", "size_bytes": None, "status": "FALTANTE",
+            })
+            continue
+        actual_digest = _sha256(file_path)
+        size = file_path.stat().st_size
+        matches = (
+            expected.get("path") == relative_path
+            and expected.get("sha256") == actual_digest
+            and expected.get("size_bytes") == size
+        )
+        actual_sources.append({
+            "id": source_id, "label": label, "path": relative_path,
+            "expected_sha256": expected.get("sha256", ""),
+            "actual_sha256": actual_digest, "size_bytes": size,
+            "status": "VERIFICADA" if matches else "MODIFICADA",
+        })
+    current_ids = {item["id"] for item in actual_sources}
+    approved_ids = set(approved_sources)
+    consistent_version = approved.get("application_version") == VERSION_APP
+    integrity_ok = (
+        approved.get("manifest_schema") == 1
+        and approved.get("algorithm") == "SHA-256"
+        and approved_ids == current_ids
+        and len(approved.get("sources", [])) == len(approved_sources)
+        and consistent_version
+        and all(item["status"] == "VERIFICADA" for item in actual_sources)
+    )
+    checked_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
+    return {
+        **approved,
+        "checked_at_utc": checked_at,
+        "integrity_ok": integrity_ok,
+        "version_ok": consistent_version,
+        "sources": actual_sources,
+    }
+
+
+def manifiesto_para_salida() -> dict:
+    """Devuelve un estado utilizable incluso si el manifiesto no está disponible."""
+    try:
+        return verificar_manifiesto_fuentes()
+    except Exception as exc:
+        return {
+            "application_version": VERSION_APP,
+            "checked_at_utc": "No disponible",
+            "integrity_ok": False,
+            "version_ok": False,
+            "sources": [],
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def agregar_hoja_trazabilidad(wb: Workbook, manifest: dict) -> None:
+    """Añade una hoja imprimible con hashes esperados y actuales."""
+    ws = wb.create_sheet("Trazabilidad SHA-256")
+    ws.sheet_view.showGridLines = False
+    ws.append(["TRAZABILIDAD DE FUENTES · CAPITAL HUMANO"])
+    ws.merge_cells("A1:G1")
+    ws.append(["Versión de la aplicación", manifest.get("application_version", "desconocida")])
+    ws.append(["Integridad del manifiesto", "VERIFICADA" if manifest.get("integrity_ok") else "REVISIÓN REQUERIDA"])
+    ws.append(["Verificación UTC", manifest.get("checked_at_utc", "No disponible")])
+    ws.append(["SHA-256 compara los bytes con el manifiesto versionado; no sustituye revisión normativa ni firma digital."])
+    ws.merge_cells("A5:G5")
+    ws.append(["ID", "Fuente", "Ruta del repositorio", "Estado", "SHA-256 aprobado", "SHA-256 actual", "Tamaño (bytes)"])
+    for source in manifest.get("sources", []):
+        ws.append([
+            source.get("id", ""), source.get("label", ""), source.get("path", ""),
+            source.get("status", "NO VERIFICADA"), source.get("expected_sha256", ""),
+            source.get("actual_sha256", ""), source.get("size_bytes"),
+        ])
+    for cell in ws[1]:
+        cell.fill = PatternFill("solid", fgColor=AZUL)
+        cell.font = Font(name="Calibri", size=15, bold=True, color=BLANCO)
+    for row_number in (2, 3, 4):
+        ws.cell(row_number, 1).font = Font(bold=True, color=AZUL)
+        ws.cell(row_number, 1).fill = PatternFill("solid", fgColor="EAF0F4")
+    ws[5][0].font = Font(name="Calibri", size=9, italic=True, color="536875")
+    ws[5][0].alignment = Alignment(wrap_text=True)
+    for cell in ws[6]:
+        cell.fill = PatternFill("solid", fgColor=VERDE)
+        cell.font = Font(name="Calibri", size=9, bold=True, color=BLANCO)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[5].height = 30
+    ws.row_dimensions[6].height = 36
+    for row in ws.iter_rows(min_row=7, max_row=ws.max_row):
+        for cell in row:
+            cell.alignment = Alignment(vertical="top", wrap_text=cell.column in (2, 3))
+            cell.border = Border(bottom=Side(style="hair", color="CBD5DC"))
+            if cell.column in (5, 6):
+                cell.font = Font(name="Consolas", size=8)
+        row[3].fill = PatternFill("solid", fgColor="E8F5EE" if row[3].value == "VERIFICADA" else "FFF2CC")
+    for letter, width in zip("ABCDEFG", (20, 48, 76, 22, 68, 68, 18)):
+        ws.column_dimensions[letter].width = width
+    if ws.max_row > 6:
+        table = Table(displayName="ManifiestoSHA256", ref=f"A6:G{ws.max_row}")
+        table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+        ws.add_table(table)
+        ws.auto_filter.ref = f"A6:G{ws.max_row}"
+    ws.freeze_panes = "A7"
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 2
+    ws.page_setup.fitToHeight = 0
+    ws.print_title_rows = "1:6"
+    ws.print_area = f"A1:G{ws.max_row}"
 
 
 # ---------------------------------------------------------------------------
@@ -453,6 +625,7 @@ def escribir_excel(filas, contadores, registros, anomalias):
         c.alignment = Alignment(wrap_text=True, vertical="top")
         ws4.row_dimensions[i].height = 30 if len(t) > 120 else 16
 
+    agregar_hoja_trazabilidad(wb, manifiesto_para_salida())
     wb.save(SALIDA_XLSX)
     print(f"  Excel generado: {SALIDA_XLSX.name}")
 
@@ -502,7 +675,7 @@ class EscalaPDF(FPDF):
         self.set_font("dejavu", "", 7.5)
         self.cell(0, 5,
                   f"Generado el {dt.date.today().strftime('%d/%m/%Y')} · "
-                  f"Página {self.page_no()} de {{nb}} · fuente: propuesta de "
+                  f"Versión {VERSION_APP} · Página {self.page_no()} de {{nb}} · fuente: propuesta de "
                   "plantilla resolución 87.xls",
                   align="C")
 
@@ -597,6 +770,25 @@ def escribir_pdf(filas, anomalias):
     ]
     for n in notas:
         pdf.multi_cell(0, 4.5, "• " + n, new_x="LMARGIN", new_y="NEXT")
+
+    manifest = manifiesto_para_salida()
+    pdf.add_page()
+    pdf.set_font("dejavu", "B", 12)
+    pdf.cell(0, 8, "TRAZABILIDAD DE FUENTES · SHA-256", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("dejavu", "", 8)
+    integridad = "VERIFICADA" if manifest.get("integrity_ok") else "REVISIÓN REQUERIDA"
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(pdf.epw, 4.5, f"Versión {VERSION_APP} · Integridad: {integridad} · Verificado UTC: {manifest.get('checked_at_utc', 'No disponible')}", new_x="LMARGIN", new_y="NEXT")
+    pdf.multi_cell(pdf.epw, 4.5, "Las huellas comparan los bytes con docs/source_manifest.json; no certifican autoría, firma digital ni vigencia jurídica de una fuente.", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    for source in manifest.get("sources", []):
+        pdf.set_font("dejavu", "B", 8)
+        pdf.multi_cell(pdf.epw, 4.2, f"{source.get('label', 'Fuente')} · {source.get('status', 'NO VERIFICADA')}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("dejavu", "", 7)
+        pdf.multi_cell(pdf.epw, 4, f"Ruta: {source.get('path', '')}\nSHA-256 aprobado: {source.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {source.get('actual_sha256', 'no disponible')} · Tamaño: {source.get('size_bytes', 'no disponible')} bytes", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(1)
+    if manifest.get("error"):
+        pdf.multi_cell(0, 4, f"Error de manifiesto: {manifest['error']}")
 
     pdf.output(SALIDA_PDF)
     print(f"  PDF generado:   {SALIDA_PDF.name}")
