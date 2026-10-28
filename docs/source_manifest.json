@@ -28,15 +28,15 @@
       "id": "motor_calculo",
       "label": "Código de extracción y cálculo",
       "path": "TES/Salariales/Nueva Escala 3210/generar_escala.py",
-      "size_bytes": 38904,
-      "sha256": "259b3e28b7d715fe7fb2cd0eaea0f440fd0df3a48199cf306ba89c5902f42d9b"
+      "size_bytes": 43005,
+      "sha256": "7ab5a4346d21ac5bb85389c006f81741a9afc03ea4f3058cf17ab24ea2f45a13"
     },
     {
       "id": "interfaz_app",
       "label": "Código de la aplicación y exportadores",
       "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
-      "size_bytes": 54531,
-      "sha256": "d3d445fe400ce174942b4dad8f2ff5b1d96d05e0a53580b851a8428439aea6e7"
+      "size_bytes": 56412,
+      "sha256": "b0a794ad3c4c6e5e6c204d808480d50725c2afd2b471808f32dde14d51940515"
     },
     {
       "id": "actualizador_manifest",

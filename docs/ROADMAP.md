@@ -12,7 +12,7 @@ La aplicación es una herramienta de modelación y apoyo basada en normativa y a
 
 La prioridad indica urgencia relativa, no una fecha comprometida. Alcance y esfuerzo se estiman antes de iniciar cada etapa; se trabaja una mejora a la vez.
 
-**Estados:** *Integrada* significa fusionada en `main` con la verificación indicada aprobada; *Parcial* identifica solo los componentes ya disponibles; *Propuesta* no autoriza por sí sola el inicio; *Bloqueada* requiere resolver primero su condición indicada.
+**Estados:** *Integrada* significa fusionada en `main` con la verificación indicada aprobada; *En curso* identifica una mejora autorizada aún no integrada; *Parcial* identifica solo los componentes ya disponibles; *Propuesta* no autoriza por sí sola el inicio; *Bloqueada* requiere resolver primero su condición indicada.
 
 | ID | Prioridad | Mejora propuesta | Beneficio | Criterio de aceptación / verificación | Estado |
 |---|---|---|---|---|---|
@@ -31,14 +31,16 @@ La prioridad indica urgencia relativa, no una fecha comprometida. Alcance y esfu
 | CH-13 | P3 · evolución | API y modelo de datos con versionado para integrar fuentes autorizadas | Abre interoperabilidad sin acoplar la interfaz a archivos locales | Contrato documentado, control de acceso y pruebas de compatibilidad hacia atrás | Propuesta; requiere arquitectura y aprobación |
 | CH-14 | P3 · evolución | Revisión independiente de seguridad, accesibilidad y exactitud normativa | Aporta evidencia externa sobre controles ya implementados, sin sustituir las pruebas internas de cada mejora | Acordar alcance y especialista; registrar hallazgos con responsable y fecha; verificar correcciones y retest; publicar límites del examen sin afirmar certificación no obtenida | Propuesta; requiere especialistas y aprobación del alcance |
 | CH-15 | P3 · evolución | Firma digital de releases e informes con clave institucional protegida externamente | Aporta autenticidad y detección de sustitución del artefacto | Verificar una firma con clave pública publicada; custodia/rotación de la clave definida por el titular | Propuesta; requiere gobierno de claves |
+| CH-16 | P1 · alta | Informe de calidad de la plantilla de origen | Hace visibles errores y casos ambiguos antes de revisar o usar la propuesta | Detecta salarios vacíos/no válidos, cargos sin descripción, posibles duplicados y discrepancias de grupo; cada hallazgo incluye hoja/fila; tabla y descarga rastreables; no corrige ni elimina filas | En curso; autorizada |
 
 ## Secuencia recomendada y puertas de avance
 
 1. **P0 — completada:** CI, comparación de escenarios y flujo de contribuciones están integrados; no reabrirlos salvo regresión o cambio de requisito.
 2. **P1 — informes, completada:** trazabilidad y documento de aprobación están integrados. **CH-06 sigue siendo solo una propuesta**; no iniciar auditoría ni cambios de accesibilidad hasta aprobar explícitamente su alcance, flujos y criterios.
-3. **P1 — dependencias externas:** CH-07 no comienza sin fuente autorizada de plazas y aprobación de Finanzas/responsable. CH-08 requiere diseño de arquitectura, roles, protección de sesiones y revisión de seguridad antes de tratar datos salariales en colaboración.
-4. **P2 — operación y uso:** priorizar importación, escenarios o recuperación solo con responsable, necesidad concreta y criterios de aceptación acordados; CH-12 debe cerrar primero sus brechas de monitorización/runbook.
-5. **P3 — evolución controlada:** API, revisiones independientes y firma digital requieren alcance aprobado, especialistas o gobierno de claves, según corresponda.
+3. **P1 — calidad de fuente, en curso:** CH-16 añade diagnósticos rastreables sin corregir ni eliminar datos de origen.
+4. **P1 — dependencias externas:** CH-07 no comienza sin fuente autorizada de plazas y aprobación de Finanzas/responsable. CH-08 requiere diseño de arquitectura, roles, protección de sesiones y revisión de seguridad antes de tratar datos salariales en colaboración.
+5. **P2 — operación y uso:** priorizar importación, escenarios o recuperación solo con responsable, necesidad concreta y criterios de aceptación acordados; CH-12 debe cerrar primero sus brechas de monitorización/runbook.
+6. **P3 — evolución controlada:** API, revisiones independientes y firma digital requieren alcance aprobado, especialistas o gobierno de claves, según corresponda.
 
 No se inicia una propuesta siguiente mientras otra esté en implementación; cada etapa se cierra con PR integrado y verificación aprobada.
 

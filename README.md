@@ -25,7 +25,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 - Calcula y muestra para cada cargo el salario original, el multiplicador, el tope y el importe ajustado.
 - Aplica un control explícito: **el salario ajustado no puede superar 6× el salario base del cargo en la plantilla fuente**.
 - Mantiene anclado el **grupo I en $3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
-- Incluye un panel ejecutivo, auditoría filtrable por cargo, comparación de dos escenarios (por grupo, CSV/Excel), diagnóstico de fuentes/HTTPS y priorización de futuras mejoras.
+- Incluye un panel ejecutivo, auditoría filtrable por cargo, comparación de dos escenarios por grupo y un diagnóstico de calidad de plantilla que marca salarios vacíos/no válidos, posibles duplicados y discrepancias con hoja/fila sin corregir la fuente.
 - Exporta escala, detalle y trazabilidad SHA-256 a **Excel (.xlsx)** y **PDF A4 horizontal**; las exportaciones CSV incluyen un manifiesto JSON en el ZIP.
 
 ## 🚀 Inicio rápido
