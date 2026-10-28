@@ -18,7 +18,10 @@ RUN python -m pip install --no-cache-dir -r /app/requirements.txt
 COPY ["TES/Salariales/Nueva Escala 3210/app_escala.py", "/app/TES/Salariales/Nueva Escala 3210/app_escala.py"]
 COPY ["TES/Salariales/Nueva Escala 3210/generar_escala.py", "/app/TES/Salariales/Nueva Escala 3210/generar_escala.py"]
 COPY ["TES/Salariales/Escala 3210_OK.xlsx", "/app/TES/Salariales/Escala 3210_OK.xlsx"]
+COPY ["TES/Salariales/goc-2026-o60.pdf", "/app/TES/Salariales/goc-2026-o60.pdf"]
 COPY ["Nueva Estructura de Plantilla/Organigrama/propuesta de plantilla por la resolucion 87.xls", "/app/Nueva Estructura de Plantilla/Organigrama/propuesta de plantilla por la resolucion 87.xls"]
+COPY ["docs/source_manifest.json", "/app/docs/source_manifest.json"]
+COPY ["tools/actualizar_manifiesto_fuentes.py", "/app/tools/actualizar_manifiesto_fuentes.py"]
 
 RUN chown -R streamlit:streamlit /app /home/streamlit
 USER streamlit

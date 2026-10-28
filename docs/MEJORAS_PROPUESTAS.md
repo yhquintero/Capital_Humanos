@@ -4,10 +4,10 @@ Lista operativa vinculada a la hoja de ruta de [Capital Humano](ROADMAP.md). Cad
 
 | ID | Mejora | Prioridad | Criterio de cierre | Verificación | Estado |
 |---|---|---|---|---|---|
-| CH-01 | Pruebas automáticas de reglas salariales y navegación | P0 | No exceder 6×; mínimo I $3,210; siete secciones y comparador sin excepción | pytest + Streamlit AppTest en GitHub Actions | Implementada en esta rama; CI remoto pendiente |
-| CH-02 | Comparador por grupos y exportación CSV/XLSX | P0 | Mostrar A/B, cambio nominal/relativo, conservar grupos sin propuesta y advertir que no es presupuesto de nómina | pruebas de datos, UI y lectura del Excel | Implementado en esta rama; revisión pendiente |
-| CH-03 | Mejorar contribución y revisión en GitHub | P0 | Plantillas de issue/PR y Dependabot activas para Python y Actions | revisar archivos y PR de actualización | Configurado en esta rama; revisión pendiente |
-| CH-04 | Huella de fuentes en cada exportación | P1 | Registrar SHA-256 de archivos normativos/plantilla y versión de la app | probar contra hash calculado de los mismos archivos | Pendiente |
+| CH-01 | Pruebas automáticas de reglas salariales y navegación | P0 | No exceder 6×; mínimo I $3,210; siete secciones y comparador sin excepción | pytest + Streamlit AppTest en GitHub Actions | Integrada en main por PR #5; CI aprobada |
+| CH-02 | Comparador por grupos y exportación CSV/XLSX | P0 | Mostrar A/B, cambio nominal/relativo, conservar grupos sin propuesta y advertir que no es presupuesto de nómina | pruebas de datos, UI y lectura del Excel | Integrado en main por PR #5 |
+| CH-03 | Mejorar contribución y revisión en GitHub | P0 | Plantillas de issue/PR y Dependabot activas para Python y Actions | revisar archivos y PR de actualización | Configurado en main por PR #5 |
+| CH-04 | Huella de fuentes en cada exportación | P1 | PDF/XLSX incluyen SHA-256; ZIP del CSV incluye JSON lateral; cambios contra manifiesto aprobado disparan advertencia | pruebas contra hashes reales, fuentes modificadas, lectura de Excel/ZIP/PDF y build Docker | Implementada en esta rama; pendiente CI/revisión |
 | CH-05 | Informe imprimible de metodología y aprobación | P1 | Identificar fuente, versión, supuestos y espacios de revisión/firma; no aparentar aprobación | generar PDF y revisar manualmente | Pendiente |
 | CH-06 | Accesibilidad y uso móvil | P1 | navegación por teclado, contraste, etiquetas y diseño adaptable | auditoría automatizada + inspección manual | Pendiente |
 | CH-07 | Presupuesto por plazas reales | P1 | Solo mostrar totales tras importar un recuento de plazas autorizado y validar fórmulas con Finanzas | casos con plazas ocupadas/vacantes conocidas | Bloqueado por fuente de datos |
@@ -18,6 +18,7 @@ Lista operativa vinculada a la hoja de ruta de [Capital Humano](ROADMAP.md). Cad
 | CH-12 | Operación y recuperación del servidor | P2 | instrucciones para healthcheck, logs, renovación TLS y recuperación | simulación documentada de indisponibilidad | Parcial |
 | CH-13 | API versionada e integraciones | P3 | contrato estable con control de acceso y compatibilidad | pruebas de contrato y autorización | Pendiente |
 | CH-14 | Revisión independiente de seguridad y accesibilidad | P3 | registrar hallazgos, responsable y prueba de remediación | evaluación externa fechada | Pendiente |
+| CH-15 | Firma digital de releases e informes | P3 | Verificar firma con clave pública publicada; custodiar y rotar la clave privada fuera del repo | verificación criptográfica reproducible por una segunda persona | Pendiente; requiere gobierno de claves |
 
 ## Regla de aceptación
 

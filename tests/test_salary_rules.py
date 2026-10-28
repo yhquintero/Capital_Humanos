@@ -2,21 +2,31 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import math
 import runpy
 import sys
+import zipfile
 from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from openpyxl import load_workbook
+from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "TES" / "Salariales" / "Nueva Escala 3210"
 sys.path.insert(0, str(APP_DIR))
 
 import generar_escala as payroll  # noqa: E402
+
+
+@pytest.fixture(scope="module")
+def app_namespace():
+    # Load export helpers without starting a Streamlit server.
+    with contextlib.redirect_stderr(io.StringIO()):
+        return runpy.run_path(str(APP_DIR / "app_escala.py"), run_name="capital_humano_export_test")
 
 
 @pytest.mark.parametrize(
@@ -81,19 +91,16 @@ def test_comparison_keeps_missing_groups_official_and_caps_proposed_groups():
     )
 
 
-def test_comparison_workbook_is_readable_and_print_ready():
+def test_comparison_workbook_is_readable_and_contains_source_hashes(app_namespace):
     proposal, _, _, _ = payroll.extraer_propuesta_plantilla()
     previous = payroll.cargar_salarios_res29()
     comparison_rows = payroll.comparar_escenarios(1, 1.5, proposal, previous)
-    app_file = APP_DIR / "app_escala.py"
-    # runpy exposes the report function without opening a server; Streamlit's
-    # harmless bare-context warning is redirected for this import-only check.
-    with contextlib.redirect_stderr(io.StringIO()):
-        namespace = runpy.run_path(str(app_file), run_name="capital_humano_report_test")
     frame = pd.DataFrame(comparison_rows)
-    data = namespace["crear_excel_comparacion"](frame, 1, 1.5)
+    manifest = payroll.verificar_manifiesto_fuentes()
+    data = app_namespace["crear_excel_comparacion"](frame, 1, 1.5, manifest)
     workbook = load_workbook(BytesIO(data), data_only=True)
     sheet = workbook["Comparación por grupo"]
+    provenance = workbook["Trazabilidad SHA-256"]
 
     assert sheet.max_row == 35
     assert sheet.max_column == 6
@@ -101,3 +108,68 @@ def test_comparison_workbook_is_readable_and_print_ready():
     assert sheet["E4"].number_format == "0.00%"
     assert sheet.freeze_panes == "A4"
     assert sheet.page_setup.orientation == "landscape"
+    assert provenance["B2"].value == payroll.VERSION_APP
+    assert provenance["B3"].value == "VERIFICADA"
+    assert provenance["D7"].value == "VERIFICADA"
+    assert len(provenance["E7"].value) == 64
+
+
+def test_filtered_csv_package_contains_json_manifest(app_namespace):
+    manifest = payroll.verificar_manifiesto_fuentes()
+    df = pd.DataFrame([{"Cargo": "Técnico", "Salario": 3210}])
+    data = app_namespace["crear_zip_csv_con_manifiesto"](df, "filtro.csv", manifest)
+    with zipfile.ZipFile(BytesIO(data)) as archive:
+        assert set(archive.namelist()) == {"filtro.csv", "manifiesto_fuentes.json", "LEEME.txt"}
+        payload = json.loads(archive.read("manifiesto_fuentes.json"))
+        assert payload["integrity_ok"] is True
+        assert len(payload["sources"]) == len(payroll.FUENTES_CONTROLADAS)
+        assert b"Cargo,Salario" in archive.read("filtro.csv")
+
+
+def test_approved_source_manifest_matches_all_tracked_files():
+    manifest = payroll.verificar_manifiesto_fuentes()
+    assert manifest["integrity_ok"] is True
+    assert manifest["application_version"] == payroll.VERSION_APP
+    assert len(manifest["sources"]) == len(payroll.FUENTES_CONTROLADAS)
+    assert all(len(source["actual_sha256"]) == 64 for source in manifest["sources"])
+
+
+def test_checked_in_reference_exports_include_verified_provenance():
+    manifest = payroll.verificar_manifiesto_fuentes()
+    example_xlsx = APP_DIR / "Escala_Salarial_3210_Nueva.xlsx"
+    workbook = load_workbook(example_xlsx, read_only=True, data_only=True)
+    assert "Trazabilidad SHA-256" in workbook.sheetnames
+    assert workbook["Trazabilidad SHA-256"]["B3"].value == "VERIFICADA"
+
+    example_pdf = APP_DIR / "Escala_Salarial_3210_Nueva.pdf"
+    pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(str(example_pdf)).pages)
+    assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    assert manifest["sources"][0]["actual_sha256"] in pdf_text
+
+
+def test_modified_expected_hash_is_detected(tmp_path):
+    approved = payroll.crear_manifiesto_fuentes()
+    approved["sources"][0]["sha256"] = "0" * 64
+    test_manifest = tmp_path / "source_manifest.json"
+    test_manifest.write_text(json.dumps(approved), encoding="utf-8")
+
+    result = payroll.verificar_manifiesto_fuentes(test_manifest)
+    assert result["integrity_ok"] is False
+    assert result["sources"][0]["status"] == "MODIFICADA"
+
+
+def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
+    proposal, _, records, _ = payroll.extraer_propuesta_plantilla()
+    previous = payroll.cargar_salarios_res29()
+    scale, details = app_namespace["crear_tablas"](1.25, proposal, records, previous)
+    manifest = payroll.verificar_manifiesto_fuentes()
+    workbook_bytes = app_namespace["crear_excel"](scale, details, 1.25, manifest)
+    workbook = load_workbook(BytesIO(workbook_bytes), data_only=True)
+    assert "Trazabilidad SHA-256" in workbook.sheetnames
+    assert workbook["Trazabilidad SHA-256"]["B3"].value == "VERIFICADA"
+
+    pdf_bytes = app_namespace["crear_pdf"](scale, details, 1.25, manifest)
+    assert pdf_bytes.startswith(b"%PDF-")
+    pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
+    assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    assert manifest["sources"][0]["actual_sha256"] in pdf_text

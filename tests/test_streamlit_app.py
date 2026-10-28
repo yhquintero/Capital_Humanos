@@ -48,5 +48,20 @@ def test_comparison_page_exposes_bounded_factors_and_exports():
         assert comparison_sliders[label].min == 1.0
         assert comparison_sliders[label].max == 6.0
     labels = [button.label.lower() for button in app_test.get("download_button")]
-    assert any("comparación csv" in label for label in labels)
+    assert any("csv + manifiesto" in label for label in labels)
     assert any("comparación excel" in label for label in labels)
+
+
+def test_system_page_reports_approved_source_integrity():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Sistema y HTTPS")
+    assert any(metric.label == "Integridad SHA-256" and metric.value == "Verificada" for metric in app_test.metric)
+    source_status = app_test.dataframe[-1].value
+    assert set(source_status["status"]) == {"VERIFICADA"}
+
+
+def test_filtered_csv_is_packaged_with_source_manifest():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Plantilla por cargo")
+    labels = [button.label.lower() for button in app_test.get("download_button")]
+    assert any("filtro csv + manifiesto" in label for label in labels)
