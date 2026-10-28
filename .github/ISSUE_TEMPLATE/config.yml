@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Proponer mejoras
+    url: https://github.com/yhquintero/Capital_Humanos/blob/main/docs/ROADMAP.md
+    about: Revisa la hoja de ruta y evita incluir salarios personales o datos sensibles.

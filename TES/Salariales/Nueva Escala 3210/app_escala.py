@@ -56,14 +56,14 @@ def crear_tablas(factor, propuesta, registros, anterior):
     for f in filas:
         salario_base = f["plantilla"]
         if salario_base is not None:
-            techo = salario_base * 6
-            salario = min(salario_base * factor, techo)
+            techo = salario_base * base.FACTOR_MAXIMO_ABSOLUTO
+            salario = base.aplicar_factor_con_tope(salario_base, factor)
             fuente = "Plantilla Resolución 87"
         else:
             # Los grupos sin cargos propuestos conservan la escala oficial vigente;
             # el mínimo del grupo I queda anclado en $3,210.
             salario_base = f["oficial"]
-            techo = salario_base * 6
+            techo = salario_base * base.FACTOR_MAXIMO_ABSOLUTO
             salario = salario_base
             fuente = "Escala oficial Res. 15/2026"
         escala.append({
@@ -79,8 +79,8 @@ def crear_tablas(factor, propuesta, registros, anterior):
     detalle = []
     for reg in registros:
         base_salario = float(reg["salario"])
-        tope = base_salario * 6
-        ajustado = min(base_salario * factor, tope)
+        tope = base_salario * base.FACTOR_MAXIMO_ABSOLUTO
+        ajustado = base.aplicar_factor_con_tope(base_salario, factor)
         # Invariante de negocio: nunca superar seis veces el valor de origen.
         assert ajustado <= tope + 1e-9
         detalle.append({
@@ -94,6 +94,64 @@ def crear_tablas(factor, propuesta, registros, anterior):
             "Salario ajustado (CUP)": ajustado,
         })
     return pd.DataFrame(escala), pd.DataFrame(detalle)
+
+
+def crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior):
+    """Devuelve una tabla auditable de diferencias salariales por grupo."""
+    return pd.DataFrame(base.comparar_escenarios(factor_a, factor_b, propuesta, anterior))
+
+
+def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b: float) -> bytes:
+    """Crea un Excel de comparación, listo para filtrar e imprimir en A4."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparación por grupo"
+    ws.sheet_view.showGridLines = False
+    ws.append(["COMPARACIÓN DE ESCENARIOS · CAPITAL HUMANO"])
+    ws.merge_cells("A1:F1")
+    ws.append([f"Escenario A: {factor_a:.2f}× · Escenario B: {factor_b:.2f}× · CUP · {date.today():%d/%m/%Y}"])
+    ws.merge_cells("A2:F2")
+    ws.append(list(comparacion.columns))
+    for fila in comparacion.itertuples(index=False, name=None):
+        ws.append(list(fila))
+    for cell in ws[1]:
+        cell.fill = PatternFill("solid", fgColor=AZUL)
+        cell.font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
+    for cell in ws[2]:
+        cell.fill = PatternFill("solid", fgColor="EAF0F4")
+        cell.font = Font(name="Calibri", size=10, italic=True, color=AZUL)
+    for cell in ws[3]:
+        cell.fill = PatternFill("solid", fgColor=VERDE)
+        cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[3].height = 34
+    edge = Side(style="hair", color="CBD5DC")
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
+        for cell in row:
+            cell.border = Border(bottom=edge)
+            cell.alignment = Alignment(vertical="center", wrap_text=cell.column in (1, 6))
+        for index in (2, 3, 4):
+            row[index - 1].number_format = '"$"#,##0.00'
+        row[4].number_format = "0.00%"
+    for column, width in enumerate((13, 22, 22, 24, 22, 45), start=1):
+        ws.column_dimensions[chr(64 + column)].width = width
+    if ws.max_row > 3:
+        table = Table(displayName="ComparacionEscenarios", ref=f"A3:F{ws.max_row}")
+        table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
+        ws.add_table(table)
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:F{ws.max_row}"
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.orientation = "landscape"
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 1
+    ws.print_title_rows = "1:3"
+    ws.print_area = f"A1:F{ws.max_row}"
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
 
 
 def crear_excel(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> bytes:
@@ -250,6 +308,7 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> byt
 NAV = [
     "Panel de control",
     "Escala salarial",
+    "Comparar escenarios",
     "Plantilla por cargo",
     "Exportaciones",
     "Sistema y HTTPS",
@@ -391,6 +450,43 @@ elif vista == "Escala salarial":
         - Los grupos ausentes en la plantilla no reciben importes inventados.
         """)
 
+elif vista == "Comparar escenarios":
+    encabezado("Comparar escenarios", "Contrasta dos factores en paralelo y revisa la diferencia salarial por grupo antes de decidir.")
+    ca, cb = st.columns(2)
+    factor_a = ca.slider("Escenario A · factor", 1.0, 6.0, 1.0, 0.05, format="%.2f×", key="comparador_a")
+    factor_b = cb.slider("Escenario B · factor", 1.0, 6.0, 1.5, 0.05, format="%.2f×", key="comparador_b")
+    comparacion_df = crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior)
+    grupos_modificados = comparacion_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
+    maxima_variacion = comparacion_df["Variación B − A (CUP)"].abs().max()
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Grupos con cambio", f"{grupos_modificados} de {len(comparacion_df)}")
+    k2.metric("Mayor cambio por grupo", f"${maxima_variacion:,.2f}")
+    k3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
+    grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]]
+    st.bar_chart(grafico_comparacion, width="stretch", height=350)
+    st.dataframe(
+        comparacion_df, width="stretch", hide_index=True,
+        column_config={
+            "Escenario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Escenario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Variación relativa": st.column_config.NumberColumn(format="percent"),
+        },
+    )
+    st.warning("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina.")
+    out_csv, out_xlsx = st.columns(2)
+    csv_comparacion = comparacion_df.to_csv(index=False).encode("utf-8-sig")
+    with out_csv:
+        st.download_button("Descargar comparación CSV", csv_comparacion, "Comparacion_escenarios_Capital_Humano.csv", "text/csv", width="stretch")
+    with out_xlsx:
+        xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b)
+        st.download_button(
+            "Descargar comparación Excel", xlsx_comparacion,
+            f"Comparacion_escenarios_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch",
+        )
+
 elif vista == "Plantilla por cargo":
     encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
     f1, f2, f3 = st.columns([1, 1, 2])
@@ -489,14 +585,17 @@ elif vista == "Mejoras futuras":
     encabezado("Próximas mejoras", "Selecciona prioridades para orientar la siguiente versión; esta selección se procesa localmente y no se envía a ningún servidor.")
     opciones = [
         "Multiplicadores independientes por grupo",
-        "Comparación de varios escenarios salariales",
+        "Guardar escenarios con nombre y recuperarlos de forma segura",
         "Cálculo del impacto presupuestario por centro/campamento",
         "Importar y validar nuevas versiones de la plantilla .xls/.xlsx",
         "Exportación PDF con logo, firmas y campos de aprobación",
         "Control de usuarios, roles y bitácora de cambios",
         "Panel Windows con botones de iniciar/detener/abrir HTTPS",
         "Programar copias de seguridad y actualización de la escala",
-        "Indicadores y gráficos de costo por grupo/categoría",
+        "Indicadores de nómina a partir de plazas autorizadas y verificadas",
+        "Mejoras de accesibilidad y experiencia móvil (WCAG)",
+        "Interfaz en inglés con referencias legales cubanas intactas",
+        "Huella verificable de fuentes en los informes descargados",
     ]
     seleccionadas = st.multiselect("¿Qué mejoras priorizarías?", opciones, placeholder="Selecciona una o varias")
     prioridad = st.select_slider("Prioridad global", options=["Baja", "Media", "Alta", "Urgente"], value="Media")
@@ -506,7 +605,8 @@ elif vista == "Mejoras futuras":
     resumen += ["", "Comentarios:", comentarios.strip() or "(sin comentarios)", ""]
     st.download_button("Descargar lista de mejoras (.txt)", "\n".join(resumen), "Mejoras_Capital_Humano.txt", "text/plain")
     st.markdown("#### Ideas recomendadas por impacto")
-    st.markdown("1. **Edición por grupo y escenarios** para comparar alternativas sin perder el factor actual.\n2. **Impacto presupuestario** con plazas ocupadas/vacantes y salarios totales.\n3. **Roles y auditoría** antes de compartir la app fuera de una red controlada.\n4. **Aprobación formal** mediante PDF con firmas, versión y fecha de vigencia.")
+    st.markdown("1. **Guardar y recuperar escenarios** para comparar decisiones aprobadas.\n2. **Presupuesto real** solo cuando exista un registro autorizado de plazas ocupadas/vacantes.\n3. **Roles individuales y bitácora** antes de permitir colaboración con datos salariales.\n4. **Trazabilidad de fuentes y aprobación** en los informes imprimibles.")
+    st.caption("Consulta criterios de aceptación y prioridades completas en la [hoja de ruta de Capital Humano](https://github.com/yhquintero/Capital_Humanos/blob/main/docs/ROADMAP.md). No adjuntes datos personales ni salarios reales a propuestas públicas de GitHub.")
 
 st.markdown("---")
 st.markdown("<div class='ch-muted'>Capital Humano · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)

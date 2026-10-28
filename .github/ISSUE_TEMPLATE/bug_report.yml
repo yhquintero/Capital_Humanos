@@ -1,0 +1,44 @@
+name: Reportar un problema
+description: Describe un fallo reproducible sin incluir información salarial personal.
+title: "[Fallo]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **No incluyas nombres, salarios individuales, archivos de plantilla confidenciales, contraseñas ni claves.**
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué ocurrió
+      description: Explica el resultado observado.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Pasos para reproducir
+      placeholder: "1. Abrí… 2. Seleccioné… 3. Ocurrió…"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión/commit
+      placeholder: "p. ej. hash corto o fecha de descarga"
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impacto
+      options:
+        - Bloquea el uso
+        - Cálculo o exportación incorrectos
+        - Interfaz o documentación
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Entorno
+      description: Sistema operativo, Python y navegador (sin datos personales).
