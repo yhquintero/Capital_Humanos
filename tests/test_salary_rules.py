@@ -257,8 +257,17 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
 
     pdf_bytes = app_namespace["crear_pdf"](scale, details, 1.25, manifest)
     assert pdf_bytes.startswith(b"%PDF-")
-    pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
-    assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    pdf_pages = PdfReader(BytesIO(pdf_bytes)).pages
+    page_texts = [page.extract_text() or "" for page in pdf_pages]
+    pdf_text = "\n".join(page_texts)
+    assert len(pdf_pages) == 10
+    assert all(text.strip() for text in page_texts)
+    detail_page = next(text for text in page_texts if "PLANTILLA PROPUESTA · DETALLE DE CARGOS" in text)
+    detail_lines = [line for line in detail_page.splitlines() if line.strip()]
+    assert detail_lines[0] == "PLANTILLA PROPUESTA · DETALLE DE CARGOS"
+    assert detail_lines[1].startswith("Fuente: propuesta de plantilla")
+    assert page_texts[-1].startswith("TRAZABILIDAD DE FUENTES")
+    assert all(f"Página {number} de {len(pdf_pages)}" in text for number, text in enumerate(page_texts, start=1))
     assert "Id." in pdf_text and "Hoja" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
 

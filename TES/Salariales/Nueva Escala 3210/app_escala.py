@@ -313,7 +313,21 @@ def _estilizar_hoja(
 
 
 def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifiesto: dict) -> bytes:
-    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    version_pie = _texto_visible(manifiesto.get("application_version"), base.VERSION_APP)
+    fecha_pie = date.today().strftime("%d/%m/%Y")
+
+    class PDFConPie(FPDF):
+        def footer(self):
+            self.set_y(-9)
+            self.set_font("DejaVu", "", 7)
+            self.set_text_color(100, 110, 118)
+            self.cell(
+                0, 5,
+                f"Capital Humano · v{version_pie} · {fecha_pie} · Página {self.page_no()} de {{nb}}",
+                align="C",
+            )
+
+    pdf = PDFConPie(orientation="L", unit="mm", format="A4")
     pdf.add_font("DejaVu", "", FUENTE)
     pdf.add_font("DejaVu", "B", FUENTE_B)
     pdf.set_auto_page_break(auto=True, margin=14)
@@ -412,12 +426,6 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
         pdf.set_font("DejaVu", "B", 8)
         pdf.multi_cell(0, 4, f"Error al verificar el manifiesto: {manifiesto['error']}")
     pdf.alias_nb_pages()
-    for n in range(1, pdf.page_no() + 1):
-        pdf.page = n
-        pdf.set_y(-9)
-        pdf.set_font("DejaVu", "", 7)
-        pdf.set_text_color(100, 110, 118)
-        pdf.cell(0, 5, f"Capital Humano · v{version} · {date.today():%d/%m/%Y} · Página {n} de {{nb}}", align="C")
     return bytes(pdf.output())
 
 
