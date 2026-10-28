@@ -19,9 +19,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Obtener el código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Preparar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -43,7 +43,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Obtener el código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Analizar los scripts sin ejecutar operaciones del equipo
         shell: pwsh
         run: ./tests/validate_powershell.ps1
@@ -54,7 +54,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Obtener el código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Validar el Compose con valores ficticios de CI
         run: |
           printf '%s\n' \
