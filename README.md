@@ -82,7 +82,7 @@ python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
 2. Mueve el multiplicador de **1.00× a 6.00×**; los resultados y el detalle se recalculan de inmediato.
 3. En **Escala salarial**, revisa los 32 grupos, sus importes y la metodología.
 4. En **Comparar escenarios**, contrasta dos multiplicadores en paralelo y exporta la tabla por grupo; no la interpretes como costo total de nómina.
-5. En **Plantilla por cargo**, filtra cargos y grupos y revisa las filas de origen.
+5. En **Plantilla por cargo**, revisa el Id. correlativo de cada cargo, filtra por grupo y hoja, y conserva la referencia de origen.
 6. En **Exportaciones**, descarga Excel, PDF detallado o el informe A4 para revisión/aprobación del escenario activo. El último es un borrador con campos manuales; no simula una autorización.
 7. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows; en **Mejoras futuras**, prioriza sugerencias que permanecen en el equipo.
 

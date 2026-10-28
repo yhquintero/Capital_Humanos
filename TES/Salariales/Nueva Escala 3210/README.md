@@ -113,6 +113,7 @@ python -m pip install -r requirements.txt
 ## Salidas y fuentes
 
 - `Escala_Salarial_3210_Nueva.xlsx` y `.pdf`: ejemplos generados por `generar_escala.py`.
+- Las descargas Excel/PDF y CSV de detalle anteponen un Id. correlativo a la hoja de origen, conservado al filtrar para contar y rastrear cada ítem; los valores faltantes aparecen en blanco, no como `None`.
 - Las descargas Excel/PDF de la app contienen la escala y los cargos con el multiplicador seleccionado; el informe de aprobación separado contiene un resumen por grupo, metodología, hashes y campos para revisión humana.
 - El informe de aprobación se marca como borrador hasta completar manualmente las revisiones y firmas; no contiene una aprobación digital ni estima el gasto total de nómina.
 - Res. 14/2026, GOC-2026-393-O60: salario mínimo mensual de $3,210.00.

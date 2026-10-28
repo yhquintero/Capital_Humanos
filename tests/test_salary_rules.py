@@ -129,14 +129,14 @@ def test_comparison_workbook_is_readable_and_contains_source_hashes(app_namespac
 
 def test_filtered_csv_package_contains_json_manifest(app_namespace):
     manifest = payroll.verificar_manifiesto_fuentes()
-    df = pd.DataFrame([{"Cargo": "Técnico", "Salario": 3210}])
+    df = pd.DataFrame([{"Id.": 1, "Hoja de origen": "Centro 1", "Cargo": "Técnico", "Salario": 3210}])
     data = app_namespace["crear_zip_csv_con_manifiesto"](df, "filtro.csv", manifest)
     with zipfile.ZipFile(BytesIO(data)) as archive:
         assert set(archive.namelist()) == {"filtro.csv", "manifiesto_fuentes.json", "LEEME.txt"}
         payload = json.loads(archive.read("manifiesto_fuentes.json"))
         assert payload["integrity_ok"] is True
         assert len(payload["sources"]) == len(payroll.FUENTES_CONTROLADAS)
-        assert b"Cargo,Salario" in archive.read("filtro.csv")
+        assert b"Id.,Hoja de origen,Cargo,Salario" in archive.read("filtro.csv")
 
 
 def test_approved_source_manifest_matches_all_tracked_files():
@@ -153,6 +153,11 @@ def test_checked_in_reference_exports_include_verified_provenance():
     workbook = load_workbook(example_xlsx, read_only=True, data_only=True)
     assert "Trazabilidad SHA-256" in workbook.sheetnames
     assert workbook["Trazabilidad SHA-256"]["B3"].value == "VERIFICADA"
+    detail_sheet = workbook["Detalle Plantilla 87"]
+    assert detail_sheet["A1"].value == "Id."
+    assert detail_sheet["B1"].value == "Hoja fuente"
+    assert detail_sheet["A2"].value == 1
+    assert detail_sheet["A184"].value == 183
 
     example_pdf = APP_DIR / "Escala_Salarial_3210_Nueva.pdf"
     pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(str(example_pdf)).pages)
@@ -180,12 +185,51 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
     workbook = load_workbook(BytesIO(workbook_bytes), data_only=True)
     assert "Trazabilidad SHA-256" in workbook.sheetnames
     assert workbook["Trazabilidad SHA-256"]["B3"].value == "VERIFICADA"
+    detail_sheet = workbook["Plantilla Resolución 87"]
+    assert [detail_sheet.cell(3, column).value for column in range(1, 4)] == [
+        "Id.", "Hoja de origen", "Fila de origen",
+    ]
+    assert detail_sheet["A4"].value == 1
+    assert detail_sheet[f"A{len(details) + 3}"].value == len(details)
+    assert detail_sheet.max_column == 9
+    assert detail_sheet["G4"].number_format == '0.00"×"'
 
     pdf_bytes = app_namespace["crear_pdf"](scale, details, 1.25, manifest)
     assert pdf_bytes.startswith(b"%PDF-")
     pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf_bytes)).pages)
     assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    assert "Id." in pdf_text and "Hoja" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
+
+
+def test_missing_values_are_blank_in_detail_excel_and_pdf(app_namespace):
+    proposal, _, records, _ = payroll.extraer_propuesta_plantilla()
+    previous = payroll.cargar_salarios_res29()
+    scale, details = app_namespace["crear_tablas"](1.25, proposal, records, previous)
+    details.loc[details.index[0], "Hoja de origen"] = "None"
+    details.loc[details.index[0], "Cargo"] = None
+    manifest = payroll.verificar_manifiesto_fuentes()
+    incomplete = {
+        **manifest,
+        "application_version": None,
+        "checked_at_utc": None,
+        "integrity_ok": False,
+        "sources": [dict(source) for source in manifest["sources"]],
+    }
+    incomplete["sources"][0].update({
+        "label": None, "status": None, "path": None,
+        "expected_sha256": None, "actual_sha256": None, "size_bytes": None,
+    })
+
+    xlsx = app_namespace["crear_excel"](scale, details, 1.25, incomplete)
+    detail_sheet = load_workbook(BytesIO(xlsx), data_only=True)["Plantilla Resolución 87"]
+    assert detail_sheet["B4"].value is None
+    assert detail_sheet["D4"].value is None
+
+    pdf = app_namespace["crear_pdf"](scale, details, 1.25, incomplete)
+    text = "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(pdf)).pages)
+    assert "None" not in text
+    assert "REVISIÓN REQUERIDA" in text
 
 
 def test_approval_report_is_a_draft_with_methodology_hashes_and_signature_fields(app_namespace):

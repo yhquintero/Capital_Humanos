@@ -440,6 +440,10 @@ borde_fino = Border(*[Side(style="thin", color="BFBFBF")] * 4)
 
 def _celda(ws, coord, valor, *, negrita=False, color=BLANCO, relleno=None,
            formato=None, alineacion="center", tamano=10):
+    if valor is None or (isinstance(valor, str) and valor.strip().casefold() in {"none", "nan", "<na>"}):
+        valor = None
+    elif isinstance(valor, float) and math.isnan(valor):
+        valor = None
     c = ws[coord]
     c.value = valor
     c.font = Font(name="Calibri", bold=negrita, size=tamano,
@@ -453,6 +457,11 @@ def _celda(ws, coord, valor, *, negrita=False, color=BLANCO, relleno=None,
 
 
 def escribir_excel(filas, contadores, registros, anomalias):
+    anomalias_visibles = [
+        _texto_sin_nulos(nota).strip()
+        for nota in (anomalias or [])
+        if _texto_sin_nulos(nota).strip()
+    ]
     wb = Workbook()
 
     # ---- Hoja 1: escala principal ----------------------------------------
@@ -521,7 +530,7 @@ def escribir_excel(filas, contadores, registros, anomalias):
     ws.merge_cells(start_row=fila_nota, start_column=1,
                    end_row=fila_nota, end_column=9)
     _celda(ws, f"A{fila_nota}",
-           "NOTAS: " + " / ".join(anomalias) if anomalias else "NOTAS: sin anomalías.",
+           "NOTAS: " + " / ".join(anomalias_visibles) if anomalias_visibles else "NOTAS: sin anomalías.",
            relleno=AMARILLO, alineacion="left", tamano=9)
     ws.row_dimensions[fila_nota].height = 30
 
@@ -565,22 +574,23 @@ def escribir_excel(filas, contadores, registros, anomalias):
     # ---- Hoja 3: detalle auditable de la plantilla -----------------------
     ws3 = wb.create_sheet("Detalle Plantilla 87")
     ws3.sheet_view.showGridLines = False
-    for j, t in enumerate(["Hoja fuente", "Fila", "Cargo",
+    for j, t in enumerate(["Id.", "Hoja fuente", "Fila", "Cargo",
                            "Grupo propuesto", "Salario propuesto (CUP)"], start=1):
         _celda(ws3, f"{get_column_letter(j)}1", t, negrita=True,
                color=BLANCO, relleno=AZUL)
     for i, reg in enumerate(registros, start=2):
         banda = GRIS if i % 2 else BLANCO
-        _celda(ws3, f"A{i}", reg["hoja"], relleno=banda, alineacion="left")
-        _celda(ws3, f"B{i}", reg["fila"], relleno=banda)
-        _celda(ws3, f"C{i}", reg["cargo"], relleno=banda, alineacion="left")
-        _celda(ws3, f"D{i}", reg["grupo"], negrita=True, relleno=banda)
-        _celda(ws3, f"E{i}", reg["salario"], relleno=banda,
+        _celda(ws3, f"A{i}", i - 1, negrita=True, relleno=AZUL_CLARO)
+        _celda(ws3, f"B{i}", reg["hoja"], relleno=banda, alineacion="left")
+        _celda(ws3, f"C{i}", reg["fila"], relleno=banda)
+        _celda(ws3, f"D{i}", reg["cargo"], relleno=banda, alineacion="left")
+        _celda(ws3, f"E{i}", reg["grupo"], negrita=True, relleno=banda)
+        _celda(ws3, f"F{i}", reg["salario"], relleno=banda,
                formato=FORMATO_MONEDA_ENTERO)
-    for j, w in enumerate([26, 8, 52, 14, 20], start=1):
+    for j, w in enumerate([8, 26, 8, 52, 14, 20], start=1):
         ws3.column_dimensions[get_column_letter(j)].width = w
     ws3.freeze_panes = "A2"
-    ws3.auto_filter.ref = f"A1:E{len(registros)+1}"
+    ws3.auto_filter.ref = f"A1:F{len(registros)+1}"
 
     # ---- Hoja 4: metodología y fuentes -----------------------------------
     ws4 = wb.create_sheet("Metodologia y fuentes")
@@ -687,6 +697,17 @@ def _moneda(v, decimales=True):
     return f"-{plantilla}" if v < 0 else plantilla
 
 
+def _texto_sin_nulos(valor, por_defecto=""):
+    """Evita imprimir nulos y sus marcadores como si fueran datos."""
+    if valor is None:
+        return por_defecto
+    if isinstance(valor, str) and valor.strip().casefold() in {"none", "nan", "<na>"}:
+        return por_defecto
+    if isinstance(valor, float) and math.isnan(valor):
+        return por_defecto
+    return str(valor)
+
+
 def escribir_pdf(filas, anomalias):
     pdf = EscalaPDF(orientation="L", unit="mm", format="A4")
     pdf.add_font("dejavu", "", FUENTE)
@@ -762,7 +783,12 @@ def escribir_pdf(filas, anomalias):
     pdf.set_font("dejavu", "B", 9)
     pdf.cell(0, 5, "Notas:", new_x="LMARGIN", new_y="NEXT")
     pdf.set_font("dejavu", "", 8)
-    notas = list(anomalias) + [
+    anomalias_visibles = [
+        _texto_sin_nulos(nota).strip()
+        for nota in (anomalias or [])
+        if _texto_sin_nulos(nota).strip()
+    ]
+    notas = anomalias_visibles + [
         "Grupos I a III y XIX a XXXII: la plantilla del Decreto 87 no incluye cargos "
         "propuestos para esos grupos (columnas en verde con “—”).",
         "La escala oficial (Res. 15/2026) es la publicación redondeada; el cálculo "
@@ -778,14 +804,21 @@ def escribir_pdf(filas, anomalias):
     pdf.set_font("dejavu", "", 8)
     integridad = "VERIFICADA" if manifest.get("integrity_ok") else "REVISIÓN REQUERIDA"
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(pdf.epw, 4.5, f"Versión {VERSION_APP} · Integridad: {integridad} · Verificado UTC: {manifest.get('checked_at_utc', 'No disponible')}", new_x="LMARGIN", new_y="NEXT")
+    verificado_utc = _texto_sin_nulos(manifest.get("checked_at_utc"), "No disponible")
+    pdf.multi_cell(pdf.epw, 4.5, f"Versión {VERSION_APP} · Integridad: {integridad} · Verificado UTC: {verificado_utc}", new_x="LMARGIN", new_y="NEXT")
     pdf.multi_cell(pdf.epw, 4.5, "Las huellas comparan los bytes con docs/source_manifest.json; no certifican autoría, firma digital ni vigencia jurídica de una fuente.", new_x="LMARGIN", new_y="NEXT")
     pdf.ln(2)
     for source in manifest.get("sources", []):
+        label = _texto_sin_nulos(source.get("label"), "Fuente sin etiqueta")
+        status = _texto_sin_nulos(source.get("status"), "NO VERIFICADA")
+        path = _texto_sin_nulos(source.get("path"), "no disponible")
+        approved_hash = _texto_sin_nulos(source.get("expected_sha256"), "no disponible")
+        current_hash = _texto_sin_nulos(source.get("actual_sha256"), "no disponible")
+        size = _texto_sin_nulos(source.get("size_bytes"), "no disponible")
         pdf.set_font("dejavu", "B", 8)
-        pdf.multi_cell(pdf.epw, 4.2, f"{source.get('label', 'Fuente')} · {source.get('status', 'NO VERIFICADA')}", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(pdf.epw, 4.2, f"{label} · {status}", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("dejavu", "", 7)
-        pdf.multi_cell(pdf.epw, 4, f"Ruta: {source.get('path', '')}\nSHA-256 aprobado: {source.get('expected_sha256', 'no disponible')}\nSHA-256 actual: {source.get('actual_sha256', 'no disponible')} · Tamaño: {source.get('size_bytes', 'no disponible')} bytes", new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(pdf.epw, 4, f"Ruta: {path}\nSHA-256 aprobado: {approved_hash}\nSHA-256 actual: {current_hash} · Tamaño: {size} bytes", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(1)
     if manifest.get("error"):
         pdf.multi_cell(0, 4, f"Error de manifiesto: {manifest['error']}")

@@ -36,6 +36,7 @@ def test_six_x_ceiling_holds_in_live_cargo_table():
     app_test.slider[-1].set_value(6.0).run(timeout=60)
     assert not app_test.exception
     details = app_test.dataframe[0].value
+    assert list(details["Id."]) == list(range(1, len(details) + 1))
     assert (details["Salario ajustado (CUP)"] <= details["Tope máximo 6× (CUP)"].round(2)).all()
 
 
