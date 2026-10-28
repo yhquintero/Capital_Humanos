@@ -85,6 +85,18 @@ FORMATO_MONEDA = '"$"#,##0.00'
 FORMATO_MONEDA_ENTERO = '"$"#,##0'
 FORMATO_PORCIENTO = '0.00%'
 FORMATO_FACTOR = '0.0000'
+FACTOR_MAXIMO_ABSOLUTO = 6.0
+
+
+def aplicar_factor_con_tope(salario_base: float, factor: float) -> float:
+    """Calcula una propuesta sin permitir que el factor exceda el máximo 6×."""
+    salario = float(salario_base)
+    multiplicador = float(factor)
+    if not math.isfinite(salario) or salario < 0:
+        raise ValueError("El salario base debe ser un número finito no negativo.")
+    if not math.isfinite(multiplicador) or not 0 <= multiplicador <= FACTOR_MAXIMO_ABSOLUTO:
+        raise ValueError(f"El factor debe estar entre 0× y {FACTOR_MAXIMO_ABSOLUTO:g}×.")
+    return min(salario * multiplicador, salario * FACTOR_MAXIMO_ABSOLUTO)
 
 
 # ---------------------------------------------------------------------------
@@ -212,6 +224,30 @@ def construir_filas(salarios_res29, propuesta):
             "plantilla": salario_plantilla,
             "dif_plantilla": dif_plantilla_oficial,
             "observacion": observacion,
+        })
+    return filas
+
+
+def comparar_escenarios(factor_a: float, factor_b: float, propuesta, salarios_res29):
+    """Compara dos multiplicadores por grupo; no estima el costo de la nómina."""
+    filas = []
+    for fila in construir_filas(salarios_res29, propuesta):
+        salario_base = fila["plantilla"]
+        if salario_base is None:
+            salario_a = salario_b = float(fila["oficial"])
+            fuente = "Escala oficial Res. 15/2026; grupo sin propuesta"
+        else:
+            salario_a = aplicar_factor_con_tope(salario_base, factor_a)
+            salario_b = aplicar_factor_con_tope(salario_base, factor_b)
+            fuente = "Plantilla Resolución 87"
+        variacion = salario_b - salario_a
+        filas.append({
+            "Grupo": fila["grupo"],
+            "Escenario A (CUP)": salario_a,
+            "Escenario B (CUP)": salario_b,
+            "Variación B − A (CUP)": variacion,
+            "Variación relativa": (variacion / salario_a) if salario_a else 0.0,
+            "Fuente": fuente,
         })
     return filas
 

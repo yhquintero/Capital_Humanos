@@ -9,6 +9,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](TES/Salariales/Nueva%20Escala%203210/README.md)
 [![Excel](https://img.shields.io/badge/Exportaci%C3%B3n-Excel%20%7C%20PDF-16866B?style=flat-square)](TES/Salariales/Nueva%20Escala%203210/)
 [![HTTPS](https://img.shields.io/badge/HTTPS-Caddy%20%2B%20Let's%20Encrypt-1C7C54?style=flat-square)](docs/HTTPS.md)
+[![CI](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml)
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-E6B85C?style=flat-square)](#-alcance-y-validación)
 
 **[Abrir la guía de uso](TES/Salariales/Nueva%20Escala%203210/README.md) · [Ver el Excel de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.xlsx) · [Ver el PDF de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.pdf)**
@@ -24,7 +25,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 - Calcula y muestra para cada cargo el salario original, el multiplicador, el tope y el importe ajustado.
 - Aplica un control explícito: **el salario ajustado no puede superar 6× el salario base del cargo en la plantilla fuente**.
 - Mantiene anclado el **grupo I en $3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
-- Incluye un panel ejecutivo, auditoría filtrable por cargo, diagnóstico de fuentes/HTTPS y un espacio para priorizar futuras mejoras.
+- Incluye un panel ejecutivo, auditoría filtrable por cargo, comparación de dos escenarios (por grupo, CSV/Excel), diagnóstico de fuentes/HTTPS y priorización de futuras mejoras.
 - Exporta la escala y el detalle de todos los cargos a **Excel (.xlsx)** y a **PDF A4 horizontal listo para imprimir**.
 
 ## 🚀 Inicio rápido
@@ -79,10 +80,11 @@ python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
 
 1. En **Panel de control**, revisa los indicadores, comparación visual y controles de fuente.
 2. Mueve el multiplicador de **1.00× a 6.00×**; los resultados y el detalle se recalculan de inmediato.
-3. En **Escala salarial** y **Plantilla por cargo**, inspecciona importes, filtra grupos/cargos y revisa las filas de origen.
-4. En **Exportaciones**, descarga el libro Excel o el PDF imprimible del escenario activo.
-5. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows.
-6. En **Mejoras futuras**, marca prioridades y descarga tus sugerencias; no se envían a ningún servidor.
+3. En **Escala salarial**, revisa los 32 grupos, sus importes y la metodología.
+4. En **Comparar escenarios**, contrasta dos multiplicadores en paralelo y exporta la tabla por grupo; no la interpretes como costo total de nómina.
+5. En **Plantilla por cargo**, filtra cargos y grupos y revisa las filas de origen.
+6. En **Exportaciones**, descarga el libro Excel o el PDF imprimible del escenario activo.
+7. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows; en **Mejoras futuras**, prioriza sugerencias que permanecen en el equipo.
 
 El control se aplica a cada salario propuesto de la plantilla; el tope se verifica por fila, no solo sobre un promedio o el total. Los grupos que no aparecen en la plantilla mantienen el valor oficial vigente, para no inventar salarios fuente inexistentes.
 
@@ -120,6 +122,19 @@ docs/HTTPS.md                         # despliegue TLS y gestión segura
 - **xlrd** — lectura del libro antiguo `.xls`.
 - **openpyxl** — generación de `.xlsx` con hojas, formato, filtros y configuración de impresión.
 - **fpdf2** — informes PDF multipágina listos para imprimir.
+
+## 🗺️ Hoja de ruta y contribuciones
+
+Las mejoras se priorizan con beneficio, esfuerzo y criterios de aceptación explícitos; no se proclama una mejora como terminada sin pruebas. Revisa la [hoja de ruta](docs/ROADMAP.md), el [tablero de propuestas](docs/MEJORAS_PROPUESTAS.md) y el [registro de cambios](CHANGELOG.md). GitHub ofrece formularios para reportar fallos y sugerir opciones sin adjuntar datos personales ni salarios reales.
+
+Para ejecutar la suite localmente:
+
+```bash
+python -m pip install -r "TES/Salariales/Nueva Escala 3210/requirements.txt" -r requirements-dev.txt
+python -m pytest -q
+```
+
+GitHub Actions repite las pruebas, analiza los scripts PowerShell en Windows y valida/compila el contenedor sin publicarlo.
 
 ## ✅ Alcance y validación
 

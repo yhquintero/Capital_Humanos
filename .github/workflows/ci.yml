@@ -1,0 +1,67 @@
+name: Calidad y seguridad básica
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas-python:
+    name: Pruebas de negocio e interfaz (Python 3.12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            TES/Salariales/Nueva Escala 3210/requirements.txt
+            requirements-dev.txt
+      - name: Instalar dependencias de app y prueba
+        run: python -m pip install -r "TES/Salariales/Nueva Escala 3210/requirements.txt" -r requirements-dev.txt
+      - name: Compilar todos los módulos Python
+        run: python -m compileall -q "TES/Salariales/Nueva Escala 3210"
+      - name: Probar reglas salariales, datos fuente y Streamlit AppTest
+        run: python -m pytest -q
+      - name: Revisar lanzador HTTPS de Linux
+        run: bash -n "TES/Salariales/Nueva Escala 3210/run_https.sh"
+
+  sintaxis-windows:
+    name: Sintaxis de scripts PowerShell
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+      - name: Analizar los scripts sin ejecutar operaciones del equipo
+        shell: pwsh
+        run: ./tests/validate_powershell.ps1
+
+  validar-contenedor:
+    name: Validar configuración y construir imagen
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@v4
+      - name: Validar el Compose con valores ficticios de CI
+        run: |
+          printf '%s\n' \
+            'DOMINIO=capital-humano.example.invalid' \
+            'APP_USER=ci-validation' \
+            'APP_PASSWORD_HASH=ci-placeholder-not-a-real-password-hash' \
+            > /tmp/capital-humano-ci.env
+          docker compose --env-file /tmp/capital-humano-ci.env -f deploy/compose.yaml config --quiet
+      - name: Construir imagen (sin publicarla)
+        run: docker build --tag capital-humano:ci .

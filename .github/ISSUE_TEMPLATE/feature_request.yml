@@ -1,0 +1,41 @@
+name: Proponer una mejora
+description: Propón un cambio medible y vinculado a la hoja de ruta.
+title: "[Mejora]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe el resultado buscado; no adjuntes datos reales de salarios ni información de trabajadores.
+  - type: textarea
+    id: need
+    attributes:
+      label: Necesidad
+      description: ¿Qué tarea o problema quieres resolver?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: ¿Qué debería poder hacer la app?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Cómo sabremos que funciona
+      description: Indica un resultado observable o una prueba.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridad aproximada
+      options:
+        - "P0: seguridad o corrección salarial"
+        - "P1: alto impacto"
+        - "P2: mejora de flujo"
+        - "P3: idea exploratoria"
+    validations:
+      required: true

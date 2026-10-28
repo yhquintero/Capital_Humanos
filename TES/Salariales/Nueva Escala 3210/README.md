@@ -9,8 +9,10 @@ Herramienta Python para recalcular la escala salarial y preparar una propuesta i
 - Validación estricta por fila: `salario ajustado ≤ salario original × 6`.
 - Mínimo del grupo I fijado en **$3,210.00 CUP** (Res. 14/2026).
 - Grupos con propuesta recalculados; los demás conservan la escala oficial Res. 15/2026 (44 h).
-- Exportación a **Excel `.xlsx`** y **PDF A4 horizontal** listo para imprimir.
+- Comparación de dos escenarios simultáneos, por grupo, con exportación CSV/Excel.
+- Exportación de la escala activa a **Excel `.xlsx`** y **PDF A4 horizontal** listo para imprimir.
 - Trazabilidad por hoja y fila de origen del libro `.xls`.
+- Pruebas automáticas de reglas de cálculo, fuentes y navegación Streamlit en GitHub Actions.
 
 ## Windows PowerShell · instalación recomendada
 
@@ -90,7 +92,7 @@ Instala [mkcert](https://github.com/FiloSottile/mkcert) una vez y abre PowerShel
 
 El primer inicio crea/confía el certificado local y valida `https://localhost:8501/_stcore/health`. El autoarranque se ejecuta bajo el mismo usuario de Windows al iniciar sesión; no se recomienda ejecutarlo como servicio de sistema porque la CA mkcert pertenece al perfil del usuario. Para quitarlo: ` .\control_app.ps1 -Accion quitar-autoinicio `. Para uso en LAN, configura el Firewall en perfil Privado y confía en la raíz mkcert desde cada dispositivo.
 
-La app web incluye ahora un **Panel de Control**, vistas de escala, auditoría filtrable de cargos, exportaciones, diagnóstico del entorno y un formulario local para priorizar mejoras futuras.
+La app web incluye un **Panel de Control**, vistas de escala y comparación A/B, auditoría filtrable, exportaciones, diagnóstico del entorno y un formulario local para priorizar mejoras futuras. La comparación muestra importes por grupo; no estima el costo total de nómina porque no dispone de cantidades autorizadas de plazas.
 
 Para obtener un certificado público validado por los navegadores y renovación automática, se necesita un dominio propio. Sigue [`docs/HTTPS.md`](../../../docs/HTTPS.md) para el despliegue Caddy + Let's Encrypt con autenticación adicional.
 
