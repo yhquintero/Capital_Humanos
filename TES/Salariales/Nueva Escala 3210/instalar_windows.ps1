@@ -42,7 +42,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Falló la instalación. Verifica que Python se
 & $pythonVenv -c "import struct,sys,pandas,pyarrow,streamlit; print('Python',sys.version.split()[0], '| bits:',struct.calcsize('P')*8,'| Streamlit',streamlit.__version__)"
 if ($LASTEXITCODE -ne 0) { throw 'La comprobación de dependencias falló.' }
 Write-Host ''
-Write-Host 'Instalación lista. HTTPS local (después de instalar mkcert):' -ForegroundColor Green
+Write-Host 'Instalación lista. Panel de control HTTPS (después de instalar mkcert):' -ForegroundColor Green
+Write-Host '.\control_app.ps1 -Accion estado'
+Write-Host '.\control_app.ps1 -Accion abrir'
+Write-Host 'Para habilitar el arranque HTTPS al iniciar sesión:'
+Write-Host '.\control_app.ps1 -Accion instalar-autoinicio'
+Write-Host 'Arranque HTTPS manual alternativo:'
 Write-Host '.\run_https.ps1'
-Write-Host 'Arranque local HTTP solo en loopback (sin certificado):'
-Write-Host '& .\.venv\Scripts\python.exe -m streamlit run .\app_escala.py --server.address 127.0.0.1'

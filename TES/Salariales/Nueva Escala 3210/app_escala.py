@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import io
+import os
+import platform
 import sys
 from datetime import date
 from pathlib import Path
@@ -38,7 +40,7 @@ DORADO = "E6B85C"
 FUENTE = base.FUENTE
 FUENTE_B = base.FUENTE_B
 
-st.set_page_config(page_title="Escala salarial | Capital Humano", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Capital Humano | Panel de Control", page_icon="📊", layout="wide")
 
 
 @st.cache_data(show_spinner="Leyendo la plantilla y verificando los grupos…")
@@ -244,80 +246,267 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float) -> byt
     return bytes(pdf.output())
 
 
-# ---- Encabezado -----------------------------------------------------------
+# ---- Interfaz profesional / panel de control -------------------------------
+NAV = [
+    "Panel de control",
+    "Escala salarial",
+    "Plantilla por cargo",
+    "Exportaciones",
+    "Sistema y HTTPS",
+    "Mejoras futuras",
+]
+
 st.markdown("""
 <style>
-.block-container{padding-top:1.8rem;max-width:1500px}
-.hero{background:linear-gradient(115deg,#15324b,#205b62);padding:1.5rem 1.8rem;border-radius:18px;color:#fff;margin-bottom:1rem}
-.hero h1{color:white;margin:0;font-size:2rem}.hero p{color:#d9e9e8;margin:.45rem 0 0}
-.small-note{color:#60717d;font-size:.88rem}
+:root{--ch-navy:#15324b;--ch-teal:#16866b;--ch-gold:#e6b85c;--ch-ink:#233746;--ch-muted:#667b89}
+.block-container{padding-top:1.3rem;padding-bottom:3rem;max-width:1520px}
+[data-testid="stSidebar"]{border-right:1px solid #e5edf0}
+[data-testid="stSidebar"] [data-testid="stMetric"]{background:#f3f8f7;border:1px solid #e1eeeb;padding:.55rem .7rem;border-radius:12px}
+.ch-hero{background:linear-gradient(118deg,#10283c,#174b59 62%,#16866b);padding:1.45rem 1.7rem;border-radius:18px;color:white;margin-bottom:1.2rem;box-shadow:0 10px 28px rgba(21,50,75,.12)}
+.ch-hero h1{color:white;font-size:2.05rem;line-height:1.2;margin:0}.ch-hero p{color:#d9e9e8;margin:.45rem 0 0;font-size:1rem}
+.ch-kicker{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:#b8ddd4;font-weight:700}
+.ch-card{border:1px solid #e3ebef;background:#fff;border-radius:15px;padding:1rem 1.1rem;height:100%;box-shadow:0 4px 15px rgba(21,50,75,.035)}
+.ch-card h3{font-size:1.03rem;margin:.1rem 0 .45rem;color:var(--ch-navy)}
+.ch-card p{margin:0;color:var(--ch-muted);font-size:.91rem}
+.ch-muted{color:var(--ch-muted);font-size:.88rem}
+.ch-status{display:inline-block;padding:.22rem .58rem;border-radius:20px;background:#e8f5ee;color:#236645;font-size:.78rem;font-weight:700}
+hr{border-color:#e8eef1}
 </style>
-<div class="hero"><h1>📊 Escala salarial · Capital Humano</h1>
-<p>Ajusta la propuesta en vivo, verifica el límite y exporta una versión lista para revisar e imprimir.</p></div>
 """, unsafe_allow_html=True)
 
 try:
     propuesta, contadores, registros, anomalias, anterior = cargar_datos()
 except Exception as exc:
-    st.error(f"No se pudo leer la plantilla de origen: {exc}")
+    st.error(f"No se pudo cargar la plantilla de origen: {exc}")
+    st.info("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.")
     st.stop()
 
 with st.sidebar:
-    st.markdown("### Parámetros de la propuesta")
-    factor = st.slider("Multiplicador salarial", min_value=1.0, max_value=6.0,
-                       value=1.0, step=0.05, format="%.2f×",
-                       help="El límite superior es seis veces el salario original de cada cargo en la plantilla fuente.")
-    st.metric("Límite máximo", "6.00×")
-    st.caption("El ajuste se actualiza inmediatamente. El grupo I permanece anclado al mínimo oficial de $3,210.00.")
+    st.markdown("<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#667b89;font-size:.83rem'>Panel de Escala Salarial</div></div>", unsafe_allow_html=True)
+    st.markdown("#### Navegación")
+    vista = st.radio("Secciones", NAV, label_visibility="collapsed", key="panel_seccion")
     st.divider()
-    st.markdown("**Fuentes**\n\n- Plantilla propuesta: archivo .xls de Resolución 87.\n- Escala vigente: Resolución 15/2026, 44 horas.\n- Mínimo: Resolución 14/2026.")
+    st.markdown("#### Escenario salarial")
+    factor = st.slider(
+        "Multiplicador común", min_value=1.0, max_value=6.0,
+        value=1.0, step=0.05, format="%.2f×", key="factor_global",
+        help="Se aplica por cargo. El límite técnico nunca excede seis veces el salario de origen.",
+    )
+    st.metric("Tope permitido", "6.00×")
+    st.caption("El grupo I mantiene el mínimo oficial de $3,210.00 CUP.")
+    st.divider()
+    st.caption("**Fuentes activas**\n\nRes. 14/2026 · Res. 15/2026 (44 h) · plantilla propuesta .xls")
 
 escala_df, detalle_df = crear_tablas(factor, propuesta, registros, anterior)
 assert detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all()
 propuesta_rows = escala_df[escala_df["Fuente del salario"] == "Plantilla Resolución 87"]
+variacion = detalle_df["Salario ajustado (CUP)"].sum() - detalle_df["Salario original (CUP)"].sum()
 
-k1, k2, k3, k4 = st.columns(4)
-k1.metric("Salario mínimo", "$3,210.00", "Grupo I · Res. 14/2026")
-k2.metric("Multiplicador actual", f"{factor:.2f}×", f"máximo 6.00×")
-k3.metric("Cargos de la plantilla", f"{len(detalle_df):,}", "Detalle auditable")
-k4.metric("Grupos con propuesta", f"{len(propuesta_rows)} de 32", "Grupos IV–XVIII")
 
-st.subheader("Escala completa de 32 grupos")
-st.caption("La columna verde se recalcula al mover el control. En los grupos sin propuesta de plantilla se conserva el valor oficial de la Resolución 15/2026.")
-st.dataframe(escala_df, width="stretch", hide_index=True, height=440,
-             column_config={
-                 "Nueva propuesta (CUP)": st.column_config.NumberColumn("Nueva propuesta (CUP)", format="$%.2f", help="Resultado recalculado; limitado a 6× la base."),
-                 "Tope máximo (6× base) (CUP)": st.column_config.NumberColumn("Tope máximo (6× base) (CUP)", format="$%.2f"),
-                 "Factor aplicado": st.column_config.NumberColumn("Factor aplicado", format="%.2f×"),
-             })
+def encabezado(titulo, bajada):
+    st.markdown(
+        f"<div class='ch-hero'><div class='ch-kicker'>Capital Humano · Gestión salarial</div><h1>{titulo}</h1><p>{bajada}</p></div>",
+        unsafe_allow_html=True,
+    )
 
-with st.expander("Ver plantilla completa por cargo (183 registros)", expanded=False):
-    st.caption("Cada fila conserva su hoja y fila de origen. El salario ajustado nunca supera seis veces el valor original de esa fila.")
-    st.dataframe(detalle_df, width="stretch", hide_index=True, height=520,
-                 column_config={
-                     "Salario original (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                     "Tope máximo 6× (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                     "Salario ajustado (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                     "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
-                 })
 
-st.subheader("Descargar o imprimir")
-excel_bytes = crear_excel(escala_df, detalle_df, factor)
-pdf_bytes = crear_pdf(escala_df, detalle_df, factor)
-b1, b2, b3 = st.columns([1, 1, 2])
-b1.download_button("⬇️ Descargar Excel (.xlsx)", data=excel_bytes,
-                   file_name=f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
-                   mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   width="stretch")
-b2.download_button("⬇️ Descargar PDF imprimible", data=pdf_bytes,
-                   file_name=f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
-                   mime="application/pdf", width="stretch")
-b3.info("El Excel incluye una hoja de escala y otra con el detalle completo de cargos. El PDF incluye ambas tablas, paginadas para impresión en A4 horizontal.")
+def mostrar_tabla_escala(tabla):
+    st.dataframe(
+        tabla, width="stretch", hide_index=True, height=490,
+        column_config={
+            "Salario anterior Res. 29/2020 (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Escala oficial Res. 15/2026 (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Base propuesta / referencia (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Tope máximo (6× base) (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Nueva propuesta (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
+        },
+    )
 
-if anomalias:
-    with st.expander("Revisar observaciones de calidad de los datos"):
-        for nota in anomalias:
-            st.warning(nota)
+
+def mostrar_tabla_detalle(tabla):
+    st.dataframe(
+        tabla, width="stretch", hide_index=True, height=560,
+        column_config={
+            "Salario original (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Tope máximo 6× (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Salario ajustado (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
+        },
+    )
+
+
+if vista == "Panel de control":
+    encabezado("Panel de Control", "Resumen ejecutivo, validaciones y accesos directos para preparar la propuesta.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Mínimo legal de referencia", "$3,210.00", "Grupo I · CUP")
+    c2.metric("Multiplicador seleccionado", f"{factor:.2f}×", "Rango permitido: 1–6×")
+    c3.metric("Cargos encontrados", f"{len(detalle_df):,}", f"{detalle_df['Grupo propuesto'].nunique()} grupos con propuesta")
+    c4.metric("Cambio total en los cargos", f"${variacion:,.2f}", "vs. salarios fuente")
+
+    left, right = st.columns([1.7, 1])
+    with left:
+        st.subheader("Vista comparativa de la escala")
+        grafico = propuesta_rows[[
+            "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
+        ]].set_index("Grupo").rename(columns={
+            "Escala oficial Res. 15/2026 (CUP)": "Oficial Res. 15/2026",
+            "Nueva propuesta (CUP)": f"Propuesta {factor:.2f}×",
+        })
+        st.bar_chart(grafico, width="stretch", height=360)
+        st.caption("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII).")
+    with right:
+        st.subheader("Estado de revisión")
+        fuentes_ok = base.RUTA_PLANTILLA.is_file() and base.RUTA_ESCALA_BASE.is_file()
+        st.markdown(f"<span class='ch-status'>{'● FUENTES DISPONIBLES' if fuentes_ok else '● REVISAR FUENTES'}</span>", unsafe_allow_html=True)
+        st.write(f"**Registros en plantilla:** {len(registros)}")
+        st.write(f"**Grupos cubiertos:** {', '.join(sorted(propuesta, key=lambda g: base.ROMANO_A_ENTERO[g]))}")
+        st.write(f"**Grupos sin propuesta:** {32 - len(propuesta)} de 32; conservan valores oficiales.")
+        st.write(f"**Control de tope:** {'Correcto' if detalle_df['Salario ajustado (CUP)'].le(detalle_df['Tope máximo 6× (CUP)'].round(2)).all() else 'ERROR'}")
+        st.write(f"**Discrepancias de origen:** {len(anomalias)} grupos con valores distintos.")
+    st.divider()
+    st.subheader("Acciones rápidas")
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        st.markdown("<div class='ch-card'><h3>📊 Revisar escala</h3><p>Consulta los 32 grupos, salarios oficiales y propuesta ajustada.</p></div>", unsafe_allow_html=True)
+    with a2:
+        st.markdown("<div class='ch-card'><h3>👥 Auditar plantilla</h3><p>Busca cargos, filtra por grupo y conserva hoja/fila de procedencia.</p></div>", unsafe_allow_html=True)
+    with a3:
+        st.markdown("<div class='ch-card'><h3>📄 Preparar entregables</h3><p>Exporta el escenario activo a un libro Excel o PDF imprimible.</p></div>", unsafe_allow_html=True)
+    if anomalias:
+        with st.expander("Observaciones detectadas en la fuente", expanded=False):
+            for nota in anomalias:
+                st.warning(nota)
+
+elif vista == "Escala salarial":
+    encabezado("Escala Salarial", f"Escenario en vivo · multiplicador {factor:.2f}× · límite absoluto 6× de la base de origen.")
+    st.info("Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $3,210.00.")
+    mostrar_tabla_escala(escala_df)
+    with st.expander("Metodología y supuestos"):
+        st.markdown("""
+        - El multiplicador global se aplica al salario por cargo de la plantilla fuente.
+        - El tope de seis veces se comprueba individualmente en cada registro.
+        - Para la tabla consolidada de grupo se usa el valor mayoritario cuando el .xls contiene discrepancias.
+        - La tabla detallada conserva cada importe individual para auditoría.
+        - Los grupos ausentes en la plantilla no reciben importes inventados.
+        """)
+
+elif vista == "Plantilla por cargo":
+    encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
+    f1, f2, f3 = st.columns([1, 1, 2])
+    grupos = sorted(detalle_df["Grupo propuesto"].unique(), key=lambda g: base.ROMANO_A_ENTERO[g])
+    hojas = sorted(detalle_df["Hoja de origen"].unique())
+    filtro_grupo = f1.multiselect("Grupo", grupos, placeholder="Todos los grupos")
+    filtro_hoja = f2.multiselect("Hoja fuente", hojas, placeholder="Todas las hojas")
+    busqueda = f3.text_input("Buscar cargo", placeholder="Ej.: director, técnico, operador…")
+    filtrada = detalle_df.copy()
+    if filtro_grupo:
+        filtrada = filtrada[filtrada["Grupo propuesto"].isin(filtro_grupo)]
+    if filtro_hoja:
+        filtrada = filtrada[filtrada["Hoja de origen"].isin(filtro_hoja)]
+    if busqueda.strip():
+        filtrada = filtrada[filtrada["Cargo"].str.contains(busqueda.strip(), case=False, regex=False, na=False)]
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Registros visibles", f"{len(filtrada):,}")
+    m2.metric("Salario fuente total", f"${filtrada['Salario original (CUP)'].sum():,.2f}")
+    m3.metric("Propuesta calculada", f"${filtrada['Salario ajustado (CUP)'].sum():,.2f}")
+    mostrar_tabla_detalle(filtrada)
+    csv = filtrada.to_csv(index=False).encode("utf-8-sig")
+    st.download_button("Descargar este filtro en CSV", csv, "Plantilla_Resolucion87_filtrada.csv", "text/csv")
+
+elif vista == "Exportaciones":
+    encabezado("Exportar y presentar", "Genera documentos consistentes con el escenario mostrado en el panel.")
+    st.write(f"**Escenario activo:** {factor:.2f}× · **Cargos:** {len(detalle_df)} · **Fecha:** {date.today():%d/%m/%Y}")
+    st.info("El Excel incluye hojas de escala y detalle auditable. El PDF presenta ambas tablas en páginas A4 horizontales.")
+    with st.spinner("Preparando los archivos para descarga…"):
+        excel_bytes = crear_excel(escala_df, detalle_df, factor)
+        pdf_bytes = crear_pdf(escala_df, detalle_df, factor)
+    e1, e2 = st.columns(2)
+    with e1:
+        st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, fórmulas/formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
+        st.download_button(
+            "Descargar Excel (.xlsx)", excel_bytes,
+            f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            width="stretch",
+        )
+    with e2:
+        st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida y listado paginado de cargos, listo para imprimir.</p></div>", unsafe_allow_html=True)
+        st.download_button(
+            "Descargar PDF imprimible", pdf_bytes,
+            f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
+            "application/pdf", width="stretch",
+        )
+    st.caption("Consejo: antes de distribuir, revisa discrepancias en el origen y confirma el factor aprobado.")
+
+elif vista == "Sistema y HTTPS":
+    encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
+    ssl_cert = str(st.get_option("server.sslCertFile") or "").strip()
+    try:
+        request_headers = {str(k).lower(): str(v) for k, v in st.context.headers.items()}
+    except Exception:
+        request_headers = {}
+    proxy_tls = request_headers.get("x-forwarded-proto", "").lower() == "https"
+    cert_file_ok = bool(ssl_cert and Path(ssl_cert).is_file())
+    tls_state = "HTTPS confirmado por proxy" if proxy_tls else ("Certificado TLS nativo configurado" if cert_file_ok else "No confirmado por esta sesión")
+    q1, q2, q3 = st.columns(3)
+    q1.metric("Canal", tls_state)
+    q2.metric("Plantilla fuente", "Disponible" if base.RUTA_PLANTILLA.is_file() else "No encontrada")
+    q3.metric("Escala histórica", "Disponible" if base.RUTA_ESCALA_BASE.is_file() else "No encontrada")
+    st.markdown("#### Información de ejecución")
+    sys_df = pd.DataFrame([
+        {"Comprobación": "Sistema operativo", "Resultado": platform.platform()},
+        {"Comprobación": "Python", "Resultado": sys.version.split()[0]},
+        {"Comprobación": "Directorio de la aplicación", "Resultado": str(CARPETA)},
+        {"Comprobación": "Configuración de certificado nativo", "Resultado": "Presente" if cert_file_ok else "No detectada"},
+        {"Comprobación": "Proxy HTTPS", "Resultado": "Detectado" if proxy_tls else "No detectado"},
+        {"Comprobación": "Validación de tope 6×", "Resultado": "Correcta" if detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all() else "Revisar"},
+    ])
+    st.dataframe(sys_df, width="stretch", hide_index=True)
+    st.warning("HTTPS cifra y autentica el servidor; no sustituye controles de acceso a nivel de aplicación. Para uso público, usa Caddy + Let's Encrypt y autenticación Basic configurada en el despliegue. No expongas directamente el puerto 8501.")
+    if os.name == "nt":
+        control_script = CARPETA / "control_app.ps1"
+        st.markdown("#### Inicio automático HTTPS en Windows")
+        if control_script.is_file():
+            st.success("Está disponible el controlador de inicio/estado de la app.")
+            st.code(".\\control_app.ps1 -Accion instalar-autoinicio\n.\\control_app.ps1 -Accion estado\n.\\control_app.ps1 -Accion detener\n.\\control_app.ps1 -Accion quitar-autoinicio", language="powershell")
+            st.caption("El inicio automático se programa al iniciar sesión del mismo usuario; la CA mkcert debe instalarse una vez en ese perfil.")
+        else:
+            st.info("El control de inicio automático se habilita con el script de gestión de Windows incluido en esta versión.")
+    else:
+        st.markdown("#### Autoarranque del servidor")
+        st.info("En Windows usa el programador de tareas del script de control. En servidores Linux, se recomienda el despliegue Docker Compose con Caddy y políticas de reinicio; certificados persistentes en el volumen caddy_data.")
+    with st.expander("Recomendaciones operativas"):
+        st.markdown("""
+        - Actualiza Python y las dependencias desde un entorno virtual x64 (Windows).
+        - No compartas `.certs`, claves privadas, `deploy/.env` ni credenciales.
+        - En producción publica solo 80/443 mediante Caddy; no abras 8501 a Internet.
+        - Comprueba HTTPS desde el navegador y que la fecha/hostname coincida con el certificado.
+        - Conserva copia de seguridad y restringe el acceso al repositorio si contiene datos sensibles.
+        """)
+
+elif vista == "Mejoras futuras":
+    encabezado("Próximas mejoras", "Selecciona prioridades para orientar la siguiente versión; esta selección se procesa localmente y no se envía a ningún servidor.")
+    opciones = [
+        "Multiplicadores independientes por grupo",
+        "Comparación de varios escenarios salariales",
+        "Cálculo del impacto presupuestario por centro/campamento",
+        "Importar y validar nuevas versiones de la plantilla .xls/.xlsx",
+        "Exportación PDF con logo, firmas y campos de aprobación",
+        "Control de usuarios, roles y bitácora de cambios",
+        "Panel Windows con botones de iniciar/detener/abrir HTTPS",
+        "Programar copias de seguridad y actualización de la escala",
+        "Indicadores y gráficos de costo por grupo/categoría",
+    ]
+    seleccionadas = st.multiselect("¿Qué mejoras priorizarías?", opciones, placeholder="Selecciona una o varias")
+    prioridad = st.select_slider("Prioridad global", options=["Baja", "Media", "Alta", "Urgente"], value="Media")
+    comentarios = st.text_area("Otras ideas o requisitos", placeholder="Describe los cambios que necesitas en futuras versiones…")
+    resumen = ["SUGERENCIAS DE MEJORA · CAPITAL HUMANO", "", f"Prioridad: {prioridad}", "", "Mejoras seleccionadas:"]
+    resumen += [f"- {x}" for x in seleccionadas] or ["- No se seleccionaron opciones."]
+    resumen += ["", "Comentarios:", comentarios.strip() or "(sin comentarios)", ""]
+    st.download_button("Descargar lista de mejoras (.txt)", "\n".join(resumen), "Mejoras_Capital_Humano.txt", "text/plain")
+    st.markdown("#### Ideas recomendadas por impacto")
+    st.markdown("1. **Edición por grupo y escenarios** para comparar alternativas sin perder el factor actual.\n2. **Impacto presupuestario** con plazas ocupadas/vacantes y salarios totales.\n3. **Roles y auditoría** antes de compartir la app fuera de una red controlada.\n4. **Aprobación formal** mediante PDF con firmas, versión y fecha de vigencia.")
 
 st.markdown("---")
-st.markdown('<p class="small-note">Herramienta de apoyo para modelar propuestas; validar los importes y las normas aplicables antes de su aprobación oficial. Fuentes detalladas en la documentación del repositorio.</p>', unsafe_allow_html=True)
+st.markdown("<div class='ch-muted'>Capital Humano · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)
