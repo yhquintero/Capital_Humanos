@@ -61,6 +61,22 @@ El lanzador `py` puede listar los intérpretes instalados con `py -0p`. Para com
 
 Debe indicar **64 bits** y Python **3.10+**.
 
+## Iniciar la aplicación
+
+Forma recomendada desde PowerShell, en esta carpeta:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run .\app_escala.py
+```
+
+Con el entorno virtual activado también funciona el comando corto:
+
+```powershell
+python .\app_escala.py
+```
+
+El script detecta que no se está ejecutando dentro de Streamlit y se relanza con su servidor web. Ya no debe mostrar la repetición de `Missing ScriptRunContext` ni el aviso de “run it with streamlit run”. Alternativamente, el modo HTTPS local se inicia con el script descrito abajo.
+
 ## HTTPS local
 
 Instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta:

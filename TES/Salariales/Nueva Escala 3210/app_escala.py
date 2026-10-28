@@ -20,6 +20,18 @@ if str(CARPETA) not in sys.path:
     sys.path.insert(0, str(CARPETA))
 import generar_escala as base  # noqa: E402
 
+# Permite el comando intuitivo `python app_escala.py` sin ejecutar widgets en
+# modo bare. La ejecución normal de Streamlit ya tiene ScriptRunContext y sigue
+# directamente al renderizado de la aplicación.
+if __name__ == "__main__":
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+    if get_script_run_ctx(suppress_warning=True) is None:
+        from streamlit.web import cli as stcli
+
+        sys.argv = ["streamlit", "run", str(Path(__file__).resolve()), *sys.argv[1:]]
+        raise SystemExit(stcli.main())
+
 AZUL = "15324B"
 VERDE = "16866B"
 DORADO = "E6B85C"

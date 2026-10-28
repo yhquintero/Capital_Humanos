@@ -51,9 +51,11 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-### Abrir la aplicación por HTTPS local
+### Abrir la aplicación
 
-Instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta `run_https.ps1` en Windows o `./run_https.sh` en Linux/macOS. Se abre `https://localhost:8501`. La CA de mkcert se confía solo en los dispositivos donde se instale explícitamente; para LAN, usa la opción correspondiente y limita el Firewall a redes privadas.
+En Windows PowerShell, desde la carpeta del proyecto, ejecuta `python .\app_escala.py` o, de forma recomendada, `.\.venv\Scripts\python.exe -m streamlit run .\app_escala.py`. El primer comando se relanza ahora mediante Streamlit, evitando los avisos de “Missing ScriptRunContext” que aparecen al ejecutar una app Streamlit como un script Python normal.
+
+Para HTTPS local, instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta `run_https.ps1` en Windows o `./run_https.sh` en Linux/macOS. Se abre `https://localhost:8501`. La CA de mkcert se confía solo en los dispositivos donde se instale explícitamente; para LAN, usa la opción correspondiente y limita el Firewall a redes privadas.
 
 Para una **URL pública con certificado reconocido**, dominio propio, renovación automática TLS y autenticación adicional por contraseña, consulta [HTTPS seguro con Caddy + Let's Encrypt](docs/HTTPS.md). Se requieren DNS apuntando al servidor y puertos 80/443 disponibles. No publiques directamente el puerto 8501.
 
