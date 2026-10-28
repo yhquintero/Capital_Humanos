@@ -24,6 +24,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 - Calcula y muestra para cada cargo el salario original, el multiplicador, el tope y el importe ajustado.
 - Aplica un control explícito: **el salario ajustado no puede superar 6× el salario base del cargo en la plantilla fuente**.
 - Mantiene anclado el **grupo I en $3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
+- Incluye un panel ejecutivo, auditoría filtrable por cargo, diagnóstico de fuentes/HTTPS y un espacio para priorizar futuras mejoras.
 - Exporta la escala y el detalle de todos los cargos a **Excel (.xlsx)** y a **PDF A4 horizontal listo para imprimir**.
 
 ## 🚀 Inicio rápido
@@ -57,6 +58,13 @@ En Windows PowerShell, desde la carpeta del proyecto, ejecuta `python .\app_esca
 
 Para HTTPS local, instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta `run_https.ps1` en Windows o `./run_https.sh` en Linux/macOS. Se abre `https://localhost:8501`. La CA de mkcert se confía solo en los dispositivos donde se instale explícitamente; para LAN, usa la opción correspondiente y limita el Firewall a redes privadas.
 
+**Autoarranque de Windows:** el script `control_app.ps1` administra el estado y puede configurar el inicio HTTPS al iniciar sesión:
+
+```powershell
+.\control_app.ps1 -Accion estado
+.\control_app.ps1 -Accion instalar-autoinicio
+```
+
 Para una **URL pública con certificado reconocido**, dominio propio, renovación automática TLS y autenticación adicional por contraseña, consulta [HTTPS seguro con Caddy + Let's Encrypt](docs/HTTPS.md). Se requieren DNS apuntando al servidor y puertos 80/443 disponibles. No publiques directamente el puerto 8501.
 
 El control **Multiplicador salarial** recalcula la propuesta en la interfaz; los botones generan Excel y PDF imprimibles.
@@ -67,12 +75,14 @@ Para regenerar los archivos de referencia originales desde la fuente:
 python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
 ```
 
-## 🧭 Cómo usar el ajuste
+## 🧭 Cómo usar el panel
 
-1. Mueve el multiplicador desde **1.00×** hasta **6.00×**; los importes de la escala y del detalle se actualizan inmediatamente.
-2. Comprueba las columnas **Salario original**, **Tope máximo 6×** y **Salario ajustado**.
-3. Revisa el detalle de cargos y las observaciones de datos en la interfaz.
-4. Descarga el libro Excel o el informe PDF. Ambos archivos identifican el multiplicador usado y mantienen trazabilidad del origen.
+1. En **Panel de control**, revisa los indicadores, comparación visual y controles de fuente.
+2. Mueve el multiplicador de **1.00× a 6.00×**; los resultados y el detalle se recalculan de inmediato.
+3. En **Escala salarial** y **Plantilla por cargo**, inspecciona importes, filtra grupos/cargos y revisa las filas de origen.
+4. En **Exportaciones**, descarga el libro Excel o el PDF imprimible del escenario activo.
+5. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows.
+6. En **Mejoras futuras**, marca prioridades y descarga tus sugerencias; no se envían a ningún servidor.
 
 El control se aplica a cada salario propuesto de la plantilla; el tope se verifica por fila, no solo sobre un promedio o el total. Los grupos que no aparecen en la plantilla mantienen el valor oficial vigente, para no inventar salarios fuente inexistentes.
 
@@ -93,6 +103,7 @@ La plantilla incluye 183 registros distribuidos entre los grupos IV–XVIII. Cua
 TES/Salariales/Nueva Escala 3210/
 ├── app_escala.py                     # interfaz web interactiva y exportadores
 ├── instalar_windows.ps1              # instala dependencias sobre Python x64
+├── control_app.ps1                   # panel local y autoarranque HTTPS
 ├── run_https.ps1 / run_https.sh      # certificado local mkcert
 ├── generar_escala.py                 # extracción y generador de referencia
 ├── requirements.txt                  # dependencias

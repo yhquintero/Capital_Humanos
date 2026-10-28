@@ -51,15 +51,24 @@ No abras directamente el puerto 8501 en el router/firewall. Solo se deben expone
 ### Windows
 
 1. Instala mkcert: `winget install FiloSottile.mkcert`.
-2. Desde PowerShell, en la raíz del repositorio:
+2. Desde PowerShell, en la carpeta `TES\Salariales\Nueva Escala 3210`, usa el panel local:
 
    ```powershell
-   .\TES\Salariales\Nueva Escala 3210\run_https.ps1
+   .\control_app.ps1 -Accion estado
+   .\control_app.ps1 -Accion iniciar
+   .\control_app.ps1 -Accion abrir
    ```
 
-3. Abre `https://localhost:8501`.
+3. Abre `https://localhost:8501`. La acción `iniciar` verifica el endpoint de salud HTTPS; `abrir` además lo abre en el navegador.
+4. Para que arranque por HTTPS al entrar a Windows:
 
-Para probar en una LAN privada, opcionalmente ejecuta el script con `-EnRedLocal`. Esto enlaza el servicio a las interfaces de red y muestra las direcciones; configura el Firewall para permitir el puerto solo en perfil de red **Privado**.
+   ```powershell
+   .\control_app.ps1 -Accion instalar-autoinicio
+   ```
+
+La tarea programada se ejecuta al **iniciar sesión del mismo usuario** (perfil que confía la CA mkcert). Para quitarla usa `-Accion quitar-autoinicio`; para detener la app, `-Accion detener`. También sigue disponible `run_https.ps1` como lanzador manual directo.
+
+Para probar en una LAN privada, usa `run_https.ps1 -EnRedLocal`. Esto enlaza el servicio a las interfaces de red y muestra las direcciones; configura el Firewall para permitir el puerto solo en perfil de red **Privado**.
 
 ### Linux / macOS
 

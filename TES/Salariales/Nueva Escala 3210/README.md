@@ -77,15 +77,20 @@ python .\app_escala.py
 
 El script detecta que no se está ejecutando dentro de Streamlit y se relanza con su servidor web. Ya no debe mostrar la repetición de `Missing ScriptRunContext` ni el aviso de “run it with streamlit run”. Alternativamente, el modo HTTPS local se inicia con el script descrito abajo.
 
-## HTTPS local
+## Panel de control y autoarranque HTTPS en Windows
 
-Instala [mkcert](https://github.com/FiloSottile/mkcert) y ejecuta:
+Instala [mkcert](https://github.com/FiloSottile/mkcert) una vez y abre PowerShell en esta carpeta. El panel de consola permite iniciar, comprobar, abrir y detener la app, además de programarla para que arranque por HTTPS al iniciar sesión:
 
 ```powershell
-.\run_https.ps1
+.\control_app.ps1 -Accion estado
+.\control_app.ps1 -Accion iniciar
+.\control_app.ps1 -Accion abrir
+.\control_app.ps1 -Accion instalar-autoinicio
 ```
 
-La aplicación abrirá `https://localhost:8501` y usará el Python del `.venv` del proyecto. La CA local queda confiable en ese equipo. El certificado de mkcert no es un certificado público de Internet. Para uso en una LAN privada se puede ejecutar ` .\run_https.ps1 -EnRedLocal `; configura también el Firewall para la red privada y confía en la raíz de mkcert desde cada dispositivo cliente.
+El primer inicio crea/confía el certificado local y valida `https://localhost:8501/_stcore/health`. El autoarranque se ejecuta bajo el mismo usuario de Windows al iniciar sesión; no se recomienda ejecutarlo como servicio de sistema porque la CA mkcert pertenece al perfil del usuario. Para quitarlo: ` .\control_app.ps1 -Accion quitar-autoinicio `. Para uso en LAN, configura el Firewall en perfil Privado y confía en la raíz mkcert desde cada dispositivo.
+
+La app web incluye ahora un **Panel de Control**, vistas de escala, auditoría filtrable de cargos, exportaciones, diagnóstico del entorno y un formulario local para priorizar mejoras futuras.
 
 Para obtener un certificado público validado por los navegadores y renovación automática, se necesita un dominio propio. Sigue [`docs/HTTPS.md`](../../../docs/HTTPS.md) para el despliegue Caddy + Let's Encrypt con autenticación adicional.
 
