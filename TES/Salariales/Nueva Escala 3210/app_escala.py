@@ -763,6 +763,8 @@ def crear_informe_aprobacion_pdf(
     pdf.set_font("DejaVu", "B", 6.8)
     pdf.set_fill_color(22, 134, 107)
     pdf.set_text_color(255, 255, 255)
+    # multi_cell deja el cursor en el borde derecho; reiniciar la tabla en el margen.
+    pdf.set_x(pdf.l_margin)
     for title, width in zip(headers, widths):
         pdf.cell(width, 7, title, border=1, align="C", fill=True, new_x="RIGHT", new_y="TOP")
     pdf.ln(7)

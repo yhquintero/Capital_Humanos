@@ -508,6 +508,22 @@ def test_approval_report_is_a_draft_with_methodology_hashes_and_signature_fields
     assert "Firma manuscrita" in report_text
     assert "Aprobar propuesta" in report_text
 
+    header_positions = []
+
+    def collect_group_table_headers(text, cm, tm, fontdict, fontsize):
+        label = (text or "").strip()
+        if label in {"Grupo", "Base/ref.", "Factor", "Propuesta"}:
+            header_positions.append((label, tm[4]))
+
+    reader.pages[0].extract_text(visitor_text=collect_group_table_headers)
+    assert [label for label, _ in header_positions] == [
+        "Grupo", "Base/ref.", "Factor", "Propuesta",
+        "Grupo", "Base/ref.", "Factor", "Propuesta",
+    ]
+    page_width = float(reader.pages[0].mediabox.width)
+    assert all(0 <= x < page_width for _, x in header_positions)
+    assert header_positions[0][1] < page_width / 4
+
     unverified = {
         **manifest,
         "integrity_ok": False,
