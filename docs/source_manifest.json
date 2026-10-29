@@ -28,15 +28,15 @@
       "id": "motor_calculo",
       "label": "Código de extracción y cálculo",
       "path": "TES/Salariales/Nueva Escala 3210/generar_escala.py",
-      "size_bytes": 43005,
-      "sha256": "7ab5a4346d21ac5bb85389c006f81741a9afc03ea4f3058cf17ab24ea2f45a13"
+      "size_bytes": 43127,
+      "sha256": "11da9e812e996110373df74759d9eb17c49a7fce58fa00e5d7c4c24b1d05adbf"
     },
     {
       "id": "interfaz_app",
       "label": "Código de la aplicación y exportadores",
       "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
-      "size_bytes": 75249,
-      "sha256": "bb4a87fb858967021c2e5bf9b40b72beb681c28fc0dbcc627f081d48251988a7"
+      "size_bytes": 75282,
+      "sha256": "749b33588504192a5ccf2d062bcb689e7498f75547c355918252216bcec97ef1"
     },
     {
       "id": "actualizador_manifest",
@@ -44,6 +44,13 @@
       "path": "tools/actualizar_manifiesto_fuentes.py",
       "size_bytes": 865,
       "sha256": "6b820ded8d9c01129c0d5fbfa223e43039be6126db75809c15d5ea675f2c5e85"
+    },
+    {
+      "id": "verificador_paquete",
+      "label": "Verificador offline de paquetes de exportación",
+      "path": "tools/verificar_paquete_exportacion.py",
+      "size_bytes": 8341,
+      "sha256": "0633c843d086b003c6ebaffafdd2c88abd2b463bcf912c80c0ba9a607ec5cbdb"
     }
   ]
 }

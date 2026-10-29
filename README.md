@@ -81,10 +81,18 @@ python "TES/Salariales/Nueva Escala 3210/generar_escala.py"
 1. En **Panel de control**, revisa los indicadores, comparación visual y controles de fuente.
 2. Mueve el multiplicador de **1.00× a 6.00×**; los resultados y el detalle se recalculan de inmediato.
 3. En **Escala salarial**, revisa los 32 grupos, sus importes y la metodología.
-4. En **Comparar escenarios**, contrasta dos multiplicadores en paralelo y exporta la tabla por grupo; no la interpretes como costo total de nómina.
-5. En **Plantilla por cargo**, revisa el Id. correlativo de cada cargo, filtra por grupo y hoja, y conserva la referencia de origen.
-6. En **Exportaciones**, descarga Excel, PDF detallado o el informe A4 para revisión/aprobación del escenario activo. El último es un borrador con campos manuales; no simula una autorización.
+4. En **Comparar escenarios**, contrasta dos multiplicadores por grupo o cargo y descarga las tablas; no interpretes sus sumas como costo total de nómina.
+5. En **Plantilla por cargo**, revisa el Id. correlativo, filtra por grupo y hoja, y anota el estado/notas de incidencias durante la sesión; la plantilla fuente no cambia.
+6. En **Exportaciones**, revisa el preflight y descarga Excel, PDF, el borrador A4 de aprobación o el ZIP integral del escenario con parámetros, incidencias, manifiesto e inventario SHA-256.
 7. En **Sistema y HTTPS**, comprueba fuentes/TLS y consulta el autoarranque HTTPS local de Windows; en **Mejoras futuras**, prioriza sugerencias que permanecen en el equipo.
+
+Para verificar fuera de la aplicación un ZIP descargado (sin extraerlo ni mostrar su contenido):
+
+```bash
+python tools/verificar_paquete_exportacion.py "Paquete_Capital_Humano_1.25x.zip"
+```
+
+El verificador devuelve código de salida `0` cuando los archivos incluidos coinciden con el inventario SHA-256 y `1` si detecta un problema. SHA-256 comprueba consistencia con el inventario adjunto; no es firma digital ni demuestra autoría, vigencia normativa o autenticidad institucional.
 
 El control se aplica a cada salario propuesto de la plantilla; el tope se verifica por fila, no solo sobre un promedio o el total. Los grupos que no aparecen en la plantilla mantienen el valor oficial vigente, para no inventar salarios fuente inexistentes.
 
@@ -115,6 +123,7 @@ deploy/                               # Caddy + Let's Encrypt + acceso protegido
 docs/HTTPS.md                         # despliegue TLS y gestión segura
 docs/source_manifest.json             # huellas aprobadas de fuentes y código
 tools/actualizar_manifiesto_fuentes.py # regenerar huellas tras revisión humana
+tools/verificar_paquete_exportacion.py # verificar ZIP descargados sin extraerlos
 docs/TRAZABILIDAD_FUENTES.md          # política y límites de SHA-256
 docs/INFORME_APROBACION.md            # uso y límites del informe para aprobación
 ```

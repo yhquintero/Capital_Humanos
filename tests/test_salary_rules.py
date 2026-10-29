@@ -19,9 +19,11 @@ from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "TES" / "Salariales" / "Nueva Escala 3210"
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(APP_DIR))
 
 import generar_escala as payroll  # noqa: E402
+from tools.verificar_paquete_exportacion import verificar_paquete  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -268,7 +270,7 @@ def test_export_preflight_accepts_consistent_data_and_blocks_invariant_failures(
     assert manifest_ready is False
 
 
-def test_complete_export_package_contains_outputs_parameters_and_verifiable_hashes(app_namespace):
+def test_complete_export_package_contains_outputs_parameters_and_verifiable_hashes(app_namespace, tmp_path):
     proposal, _, records, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
     detail = app_namespace["crear_tablas"](
         1.25, proposal, records, payroll.cargar_salarios_res29()
@@ -280,6 +282,9 @@ def test_complete_export_package_contains_outputs_parameters_and_verifiable_hash
     package = app_namespace["crear_paquete_completo"](
         b"xlsx-output", b"pdf-output", b"approval-draft", 1.25, detail, review, manifest
     )
+    package_path = tmp_path / "app_generated_package.zip"
+    package_path.write_bytes(package)
+    assert verificar_paquete(package_path)["ok"] is True
 
     with zipfile.ZipFile(BytesIO(package)) as archive:
         names = set(archive.namelist())

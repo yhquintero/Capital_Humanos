@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -82,6 +83,22 @@ def test_export_page_offers_separate_approval_report():
         if {"Control", "Resultado", "Detalle"}.issubset(frame.value.columns)
     )
     assert set(preflight["Resultado"]) == {"Correcto"}
+
+
+def test_export_page_never_renders_pdf_none_return_values():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Exportaciones")
+    rendered_none = [
+        markdown.value for markdown in app_test.markdown
+        if markdown.value.strip().casefold() in {"none", "`none`"}
+    ]
+    assert rendered_none == []
+    quality_warnings = [
+        warning.value for warning in app_test.warning
+        if "incidencias de calidad" in warning.value.casefold()
+    ]
+    assert len(quality_warnings) == 1
+    assert re.match(r"Hay \d+ incidencias de calidad\b", quality_warnings[0])
 
 
 def test_system_page_reports_approved_source_integrity():
