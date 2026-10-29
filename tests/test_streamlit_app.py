@@ -30,6 +30,31 @@ def test_every_navigation_section_renders_without_exception():
         _assert_page_runs(app_test, page)
 
 
+def test_english_interface_renders_every_section_and_translates_source_status():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    app_test.session_state["idioma_interfaz"] = "English"
+    app_test.run(timeout=60)
+    english_pages = [
+        "Dashboard", "Salary scale", "Compare Scenarios", "Staff Template",
+        "Exports", "System and HTTPS", "Future improvements",
+    ]
+    assert not app_test.exception
+    assert app_test.radio[0].options == english_pages
+    for page in english_pages:
+        app_test.radio[0].set_value(page).run(timeout=60)
+        assert not app_test.exception, f"{page}: {[item.message for item in app_test.exception]}"
+    app_test.radio[0].set_value("Salary scale").run(timeout=60)
+    scale_columns = app_test.dataframe[0].value.columns.tolist()
+    assert "Maximum cap (6× base) (CUP)" in scale_columns
+    assert "Salary source" in scale_columns
+    app_test.radio[0].set_value("Staff Template").run(timeout=60)
+    detail_columns = app_test.dataframe[0].value.columns.tolist()
+    assert detail_columns[:4] == ["ID", "Source sheet", "Source row", "Position"]
+    app_test.radio[0].set_value("System and HTTPS").run(timeout=60)
+    assert any(metric.label == "SHA-256 integrity" and metric.value == "Verified" for metric in app_test.metric)
+    assert set(app_test.dataframe[-1].value["Status"]) == {"VERIFIED"}
+
+
 def test_six_x_ceiling_holds_in_live_cargo_table():
     app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
     _assert_page_runs(app_test, "Plantilla por cargo")
