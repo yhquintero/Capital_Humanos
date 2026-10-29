@@ -12,7 +12,10 @@ import i18n
 
 
 def test_english_currency_date_and_interpolated_messages():
-    assert i18n.format_currency(1234.5, "en") == "CUP 1,234.50"
+    assert i18n.format_currency(1234.5, "en") == "$ 1,234.50"
+    assert i18n.format_currency(3210, "es") == "$ 3,210.00"
+    assert i18n.format_currency(-3210, "en") == "$ -3,210.00"
+    assert i18n.format_currency(float("inf"), "es") == "—"
     assert i18n.format_date(date(2026, 10, 28), "en") == "2026-10-28"
     assert i18n.translate("Hay {count} incidencias de calidad pendientes de revisión. Puedes descargar los informes para revisión, pero no interpretes su generación como resolución de esas incidencias.", "en", count="7") == (
         "7 quality issues are pending review. You may download the reports for review, but their generation does not resolve those issues."

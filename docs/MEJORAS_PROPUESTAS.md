@@ -4,7 +4,7 @@ Lista operativa vinculada a la hoja de ruta de [Capital Humano](ROADMAP.md). Cad
 
 | ID | Mejora | Prioridad | Criterio de cierre | Verificación | Estado |
 |---|---|---|---|---|---|
-| CH-01 | Pruebas automáticas de reglas salariales y navegación | P0 | No exceder 6×; mínimo I $3,210; siete secciones y comparador sin excepción | pytest + Streamlit AppTest en GitHub Actions | Integrada en main por PR #5; CI aprobada |
+| CH-01 | Pruebas automáticas de reglas salariales y navegación | P0 | No exceder 6×; mínimo I $ 3,210; siete secciones y comparador sin excepción | pytest + Streamlit AppTest en GitHub Actions | Integrada en main por PR #5; CI aprobada |
 | CH-02 | Comparador por grupos y exportación CSV/XLSX | P0 | Mostrar A/B, cambio nominal/relativo, conservar grupos sin propuesta y advertir que no es presupuesto de nómina | pruebas de datos, UI y lectura del Excel | Integrado en main por PR #5 |
 | CH-03 | Mejorar contribución y revisión en GitHub | P0 | Plantillas de issue/PR y Dependabot activas para Python y Actions | revisar archivos y PR de actualización | Integrada en main por PR #5 |
 | CH-04 | Huella de fuentes en cada exportación | P1 | PDF/XLSX incluyen SHA-256; ZIP del CSV incluye JSON lateral; cambios contra manifiesto aprobado disparan advertencia | pruebas contra hashes reales, fuentes modificadas, lectura de Excel/ZIP/PDF y build Docker | Integrada en main por PR #12; CI aprobada |

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 =============================================================================
- GENERADOR DE LA NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $3,210.00
+ GENERADOR DE LA NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $ 3,210.00
 -----------------------------------------------------------------------------
  Entradas:
    1. "Nueva Estructura de Plantilla/Organigrama/
@@ -104,8 +104,8 @@ RESPALDO_RES29 = {
     "XXX": 8510, "XXXI": 9010, "XXXII": 9510,
 }
 
-FORMATO_MONEDA = '"$"#,##0.00'
-FORMATO_MONEDA_ENTERO = '"$"#,##0'
+FORMATO_MONEDA = '"$ "#,##0.00'
+FORMATO_MONEDA_ENTERO = '"$ "#,##0.00'
 FORMATO_PORCIENTO = '0.00%'
 FORMATO_FACTOR = '0.0000'
 FACTOR_MAXIMO_ABSOLUTO = 6.0
@@ -485,7 +485,7 @@ def extraer_propuesta_plantilla_con_calidad(file_bytes: bytes | None = None, fil
             if clave_duplicado in vistos:
                 hoja_previa, fila_previa = vistos[clave_duplicado]
                 hallazgos.append(_crear_hallazgo_calidad(
-                    "Posible duplicado", hoja.name, fila_origen, cargo, grupo, f"${salario:,.2f}",
+                    "Posible duplicado", hoja.name, fila_origen, cargo, grupo, f"$ {salario:,.2f}",
                     f"Coincide con {hoja_previa}, fila {fila_previa}. Se conserva para revisión; no se elimina.",
                 ))
             else:
@@ -498,12 +498,12 @@ def extraer_propuesta_plantilla_con_calidad(file_bytes: bytes | None = None, fil
         if len(contador) <= 1:
             continue
         valores = ", ".join(
-            f"${salario:,.2f} ({cantidad} ocurrencias)"
+            f"$ {salario:,.2f} ({cantidad} ocurrencias)"
             for salario, cantidad in contador.most_common()
         )
         anomalias.append(
             f"Grupo {grupo}: valores encontrados -> {valores}. "
-            f"Se adopta ${mapa_canonico[grupo]:,.2f} por ser el mayoritario."
+            f"Se adopta $ {mapa_canonico[grupo]:,.2f} por ser el mayoritario."
         )
         frecuencia_maxima = max(contador.values())
         valores_mayoritarios = {
@@ -511,7 +511,7 @@ def extraer_propuesta_plantilla_con_calidad(file_bytes: bytes | None = None, fil
         }
         detalle = (
             f"El grupo contiene varios salarios: {valores}. "
-            f"La tabla consolidada actual usa ${mapa_canonico[grupo]:,.2f}; "
+            f"La tabla consolidada actual usa $ {mapa_canonico[grupo]:,.2f}; "
             "la fuente permanece intacta y debe revisarse antes del uso oficial."
         )
         for registro in registros:
@@ -521,7 +521,7 @@ def extraer_propuesta_plantilla_con_calidad(file_bytes: bytes | None = None, fil
                 continue
             hallazgos.append(_crear_hallazgo_calidad(
                 "Discrepancia salarial de grupo", registro["hoja"], registro["fila"],
-                registro["cargo"], grupo, f"${registro['salario']:,.2f}", detalle,
+                registro["cargo"], grupo, f"$ {registro['salario']:,.2f}", detalle,
             ))
 
     hallazgos.sort(key=lambda item: (
@@ -747,7 +747,7 @@ def escribir_excel(filas, contadores, registros, anomalias):
 
     ws.merge_cells("A1:I1")
     _celda(ws, "A1",
-           "NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $3,210.00 (Res. 14/2026 y 15/2026, GOC-2026-O60)",
+           "NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $ 3,210.00 (Res. 14/2026 y 15/2026, GOC-2026-O60)",
            negrita=True, color=BLANCO, relleno=AZUL, tamano=13,
            alineacion="center")
     ws.row_dimensions[1].height = 26
@@ -825,7 +825,7 @@ def escribir_excel(filas, contadores, registros, anomalias):
            negrita=True, color=BLANCO, relleno=AZUL, alineacion="left", tamano=11)
     for j, t in enumerate([
         "Grupo de complejidad", "Salario Res. 29/2020",
-        "Nueva escala (mínimo $3,210.00)", "Correlación Res. 29",
+        "Nueva escala (mínimo $ 3,210.00)", "Correlación Res. 29",
         "Diferencia"], start=1):
         _celda(ws2, f"{get_column_letter(j)}2", t, negrita=True,
                color=BLANCO, relleno=AZUL)
@@ -875,7 +875,7 @@ def escribir_excel(filas, contadores, registros, anomalias):
     texto = [
         ("METODOLOGÍA Y FUENTES", True),
         ("", False),
-        ("1. Salario mínimo: $3,210.00 mensuales, Resolución 14/2026 del MTSS "
+        ("1. Salario mínimo: $ 3,210.00 mensuales, Resolución 14/2026 del MTSS "
          "(GOC-2026-393-O60, Gaceta Oficial No. 60 Ordinaria de 17/07/2026, p. 1839).", False),
         ("2. Escala oficial de 32 grupos (I a XXXII), régimen de 44 horas: "
          "Resolución 15/2026 (GOC-2026-394-O60), pp. 1839-1840. Los valores son los "
@@ -947,7 +947,7 @@ FUENTE, FUENTE_B = _localizar_fuentes_pdf()
 class EscalaPDF(FPDF):
     def header(self):
         self.set_font("dejavu", "B", 13)
-        self.cell(0, 8, "NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $3,210.00",
+        self.cell(0, 8, "NUEVA ESCALA SALARIAL — SALARIO MÍNIMO $ 3,210.00",
                   align="C", new_x="LMARGIN", new_y="NEXT")
         self.set_font("dejavu", "", 9)
         self.cell(0, 5,
@@ -969,8 +969,8 @@ class EscalaPDF(FPDF):
 def _moneda(v, decimales=True):
     if v is None:
         return "—"
-    plantilla = f"${abs(v):,.2f}" if decimales else f"${abs(v):,.0f}"
-    return f"-{plantilla}" if v < 0 else plantilla
+    plantilla = f"$ {abs(v):,.2f}"
+    return f"$ -{abs(v):,.2f}" if v < 0 else plantilla
 
 
 def _texto_sin_nulos(valor, por_defecto=""):
@@ -1108,7 +1108,7 @@ def escribir_pdf(filas, anomalias):
 # ---------------------------------------------------------------------------
 def main():
     print("=" * 70)
-    print(" GENERADOR DE ESCALA SALARIAL — MÍNIMO $3,210.00")
+    print(" GENERADOR DE ESCALA SALARIAL — MÍNIMO $ 3,210.00")
     print("=" * 70)
 
     print("[1/4] Leyendo escala anterior (Res. 29/2020)...")
@@ -1119,7 +1119,7 @@ def main():
     propuesta, contadores, registros, anomalias = extraer_propuesta_plantilla()
     print(f"      {len(registros)} cargos registrados en {len(contadores)} grupos.")
     for g in sorted(propuesta, key=lambda x: ROMANO_A_ENTERO[x]):
-        print(f"        grupo {g:>6}: ${propuesta[g]:,.2f}")
+        print(f"        grupo {g:>6}: $ {propuesta[g]:,.2f}")
     if anomalias:
         print("      ANOMALÍAS:")
         for a in anomalias:

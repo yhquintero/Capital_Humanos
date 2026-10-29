@@ -74,6 +74,11 @@ def test_official_scale_has_32_groups_and_preserves_minimum():
     assert payroll.ESCALA_OFICIAL_RES15["I"] == 3210
 
 
+def test_generated_workbook_currency_format_uses_requested_style():
+    assert payroll.FORMATO_MONEDA == '\"$ \"#,##0.00'
+    assert payroll.FORMATO_MONEDA_ENTERO == '\"$ \"#,##0.00'
+
+
 def test_source_files_are_present_and_template_is_auditable():
     assert payroll.RUTA_PLANTILLA.is_file()
     assert payroll.RUTA_ESCALA_BASE.is_file()
@@ -404,6 +409,7 @@ def test_checked_in_reference_exports_include_verified_provenance():
     example_pdf = APP_DIR / "Escala_Salarial_3210_Nueva.pdf"
     pdf_text = "\n".join(page.extract_text() or "" for page in PdfReader(str(example_pdf)).pages)
     assert "TRAZABILIDAD DE FUENTES" in pdf_text
+    assert "$ 3,210.00" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
 
 
@@ -434,6 +440,7 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
     assert detail_sheet["A4"].value == 1
     assert detail_sheet[f"A{len(details) + 3}"].value == len(details)
     assert detail_sheet.max_column == 9
+    assert detail_sheet["F4"].number_format == '\"$ \"#,##0.00'
     assert detail_sheet["G4"].number_format == '0.00"×"'
 
     pdf_bytes = app_namespace["crear_pdf"](scale, details, 1.25, manifest)
