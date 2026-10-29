@@ -14,7 +14,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 [![CI](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml)
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-E6B85C?style=flat-square)](#-alcance-y-validación)
 
-[Accesibilidad](docs/ACCESSIBILITY.md) · [Contribuir](CONTRIBUTING.md) · [Seguridad](SECURITY.md)
+[Accesibilidad](docs/ACCESSIBILITY.md) · [Diseño de roles](docs/ROLES.md) · [Contribuir](CONTRIBUTING.md) · [Seguridad](SECURITY.md)
 
 > **Licencia:** pendiente de definición. No se ha añadido un archivo `LICENSE`.
 
