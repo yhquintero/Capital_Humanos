@@ -25,7 +25,7 @@ Lista operativa vinculada a la hoja de ruta de [Capital Humano](ROADMAP.md). Cad
 | CH-19 | Anotación manual de incidencias | P2 | Estados y notas de revisión editables, preservados durante la sesión y en archivos descargados; plantilla original inmutable | prueba de IDs estables, descarga anotada y estado de sesión | Integrada en main vía PR #18; CI aprobada |
 | CH-20 | Paquete integral ZIP | P2 | Reunir Excel, PDF, borrador de aprobación, parámetros, incidencias anotadas, manifiesto de fuentes y hashes de todos los demás archivos | verificar contenido ZIP, parámetros y cada hash SHA-256 | Integrada en main vía PR #18; CI aprobada |
 | CH-21 | Verificador offline de paquetes | P1 | Comprobar hashes y estructura sin extraer ni mostrar datos salariales; detectar cambios, faltantes, extras y rutas inseguras | pruebas con ZIP íntegro, alterado, incompleto, extra y malformado; CLI sin fuga de contenido | Integrada en main vía PR #19; CI aprobada |
-| CH-22 | Presentación ejecutiva y lenguaje visual profesional | P2 | Diseño claro con paleta institucional, KPIs, gráficos y estados priorizados; adaptación móvil; nunca presentar sumas de cargos como presupuesto de nómina | AppTest ES/EN, integridad, límites, contraste automático y revisión manual posterior | En curso; rediseño de tablero, pendientes pruebas/CI |
+| CH-22 | Presentación ejecutiva y lenguaje visual profesional | P2 | Diseño claro con paleta institucional, KPIs, gráficos y estados priorizados; adaptación móvil; nunca presentar sumas de cargos como presupuesto de nómina | AppTest ES/EN, integridad, límites y contraste automático | En curso en PR #25; 67 pruebas locales y los tres checks de CI pasan; preview disponible para revisión visual |
 
 ## Regla de aceptación
 
