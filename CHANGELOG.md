@@ -16,6 +16,7 @@ Cambios funcionales y de operación, organizados por versión.
 - Añadido un Id. correlativo antes de la hoja de origen en listados y exportaciones; los valores nulos se dejan en blanco y no se imprimen como `None`.
 - Añadido un informe A4 para revisión y aprobación humana, con método, resumen por grupo, trazabilidad completa y campos manuales de decisión/firma; se marca siempre como borrador.
 - Corregida la posición de los encabezados del resumen por grupo en el informe de aprobación PDF para alinearlos con las columnas de datos.
+- Iniciada CH-06 con foco visible, contraste de texto secundario y ajustes de reflujo; las pruebas manuales con navegador y lector de pantalla siguen pendientes.
 - En curso: diagnóstico auditable de calidad de plantilla con hallazgos por hoja/fila, conservando la fuente sin autocorrecciones.
 - Corregido el pie del PDF de plantilla para que no fuerce saltos de página ni se superponga al encabezado de “PLANTILLA PROPUESTA · DETALLE DE CARGOS”.
 
