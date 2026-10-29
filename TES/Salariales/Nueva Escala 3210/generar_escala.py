@@ -67,6 +67,7 @@ FUENTES_CONTROLADAS = (
     ("gaceta_2026", "Gaceta Oficial · Resoluciones 14/2026 y 15/2026", "TES/Salariales/goc-2026-o60.pdf"),
     ("motor_calculo", "Código de extracción y cálculo", "TES/Salariales/Nueva Escala 3210/generar_escala.py"),
     ("interfaz_app", "Código de la aplicación y exportadores", "TES/Salariales/Nueva Escala 3210/app_escala.py"),
+    ("interfaz_traducciones", "Traducciones de interfaz", "TES/Salariales/Nueva Escala 3210/i18n.py"),
     ("actualizador_manifest", "Herramienta de actualización del manifiesto", "tools/actualizar_manifiesto_fuentes.py"),
     ("verificador_paquete", "Verificador offline de paquetes de exportación", "tools/verificar_paquete_exportacion.py"),
 )

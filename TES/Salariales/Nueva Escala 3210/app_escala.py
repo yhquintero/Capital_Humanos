@@ -24,6 +24,10 @@ from openpyxl.utils import get_column_letter
 
 CARPETA = Path(__file__).resolve().parent
 RAIZ_REPO = CARPETA.parents[2]
+if str(CARPETA) not in sys.path:
+    sys.path.insert(0, str(CARPETA))
+import i18n as ui
+
 RUTA_GENERADOR = CARPETA / "generar_escala.py"
 _SPEC_GENERADOR = importlib.util.spec_from_file_location(
     "_capital_humano_generar_escala", RUTA_GENERADOR
@@ -57,10 +61,22 @@ DORADO = "E6B85C"
 FUENTE = base.FUENTE
 FUENTE_B = base.FUENTE_B
 
-st.set_page_config(page_title="Capital Humano | Panel de Control", page_icon="📊", layout="wide")
+UI_LANGUAGE_LABEL = st.session_state.get("idioma_interfaz", "Español")
+UI_LANGUAGE = "en" if UI_LANGUAGE_LABEL == "English" else "es"
 
 
-@st.cache_data(show_spinner="Leyendo la plantilla y verificando los grupos…")
+def T(text: str, **values) -> str:
+    return ui.translate(text, UI_LANGUAGE, **values)
+
+
+st.set_page_config(
+    page_title="Human Capital | Dashboard" if UI_LANGUAGE == "en" else "Capital Humano | Panel de Control",
+    page_icon="📊",
+    layout="wide",
+)
+
+
+@st.cache_data(show_spinner=T("Leyendo la plantilla y verificando los grupos…"))
 def _cargar_datos_oficiales():
     propuesta, contadores, registros, anomalias, hallazgos_calidad = base.extraer_propuesta_plantilla_con_calidad()
     anterior = base.cargar_salarios_res29()
@@ -995,8 +1011,8 @@ try:
     plantilla_sha256 = st.session_state.get("plantilla_importada", {}).get("sha256")
     propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad = cargar_datos(plantilla_sha256)
 except Exception as exc:
-    st.error(f"No se pudo cargar la plantilla de origen: {exc}")
-    st.info("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.")
+    st.error(T("No se pudo cargar la plantilla de origen: {error}", error=str(exc)))
+    st.info(T("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README."))
     st.stop()
 
 manifiesto = cargar_manifiesto()
@@ -1004,32 +1020,41 @@ version_visible = _texto_visible(manifiesto.get("application_version"), base.VER
 fecha_verificacion_visible = _texto_visible(manifiesto.get("checked_at_utc"), "No disponible")
 if st.session_state.get("plantilla_importada"):
     st.warning(
-        "Plantilla temporal activa solo en esta sesión. Es una fuente no aprobada: todas las descargas salariales están bloqueadas. "
-        "Restaura la plantilla oficial para volver a exportar.",
+        T("Plantilla temporal activa solo en esta sesión. Es una fuente no aprobada: todas las descargas salariales están bloqueadas. Restaura la plantilla oficial para volver a exportar."),
         icon="⚠️",
     )
 elif not manifiesto.get("integrity_ok"):
     st.warning(
-        "La copia actual de una o más fuentes o archivos de cálculo no coincide con el manifiesto aprobado. "
-        "Revisa la sección Sistema y HTTPS y no distribuyas los informes hasta validar el cambio.",
+        T("La copia actual de una o más fuentes o archivos de cálculo no coincide con el manifiesto aprobado. Revisa la sección Sistema y HTTPS y no distribuyas los informes hasta validar el cambio."),
         icon="⚠️",
     )
 
 with st.sidebar:
-    st.markdown("<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#667b89;font-size:.83rem'>Panel de Escala Salarial</div></div>", unsafe_allow_html=True)
-    st.markdown("#### Navegación")
-    vista = st.radio("Secciones", NAV, label_visibility="collapsed", key="panel_seccion")
-    st.divider()
-    st.markdown("#### Escenario salarial")
-    factor = st.slider(
-        "Multiplicador común", min_value=1.0, max_value=6.0,
-        value=1.0, step=0.05, format="%.2f×", key="factor_global",
-        help="Se aplica por cargo. El límite técnico nunca excede seis veces el salario de origen.",
+    st.markdown(
+        f"<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#667b89;font-size:.83rem'>{T('Panel de Escala Salarial')}</div></div>",
+        unsafe_allow_html=True,
     )
-    st.metric("Tope permitido", "6.00×")
-    st.caption("El grupo I mantiene el mínimo oficial de $3,210.00 CUP.")
+    idioma_visible = st.selectbox("Idioma / Language", ["Español", "English"], key="idioma_interfaz")
+    st.markdown(f"#### {T('Navegación')}")
+    vistas_visibles = [T(item) for item in NAV]
+    vista_elegida = st.radio(T("Secciones"), vistas_visibles, label_visibility="collapsed", key="panel_seccion")
+    vista = NAV[vistas_visibles.index(vista_elegida)]
     st.divider()
-    st.caption("**Fuentes activas**\n\nRes. 14/2026 · Res. 15/2026 (44 h) · plantilla propuesta .xls")
+    st.markdown(f"#### {T('Escenario salarial')}")
+    factor = st.slider(
+        T("Multiplicador común"), min_value=1.0, max_value=6.0,
+        value=1.0, step=0.05, format="%.2f×", key="factor_global",
+        help=T("Se aplica por cargo. El límite técnico nunca excede seis veces el salario de origen."),
+    )
+    st.metric(T("Tope permitido"), "6.00×")
+    st.caption(T("El grupo I mantiene el mínimo oficial de $3,210.00 CUP."))
+    st.divider()
+    fuentes_etiqueta = (
+        "Res. 14/2026 · Res. 15/2026 (44 h) · proposed template .xls"
+        if UI_LANGUAGE == "en"
+        else "Res. 14/2026 · Res. 15/2026 (44 h) · plantilla propuesta .xls"
+    )
+    st.caption(f"**{T('Fuentes activas')}**\n\n{fuentes_etiqueta}")
 
 escala_df, detalle_df = crear_tablas(factor, propuesta, registros, anterior)
 revision_calidad_base = crear_tabla_revision_calidad(hallazgos_calidad)
@@ -1048,13 +1073,21 @@ variacion = detalle_df["Salario ajustado (CUP)"].sum() - detalle_df["Salario ori
 
 def encabezado(titulo, bajada):
     st.markdown(
-        f"<div class='ch-hero'><div class='ch-kicker'>Capital Humano · Gestión salarial</div><h1>{titulo}</h1><p>{bajada}</p></div>",
+        f"<div class='ch-hero'><div class='ch-kicker'>{T('Capital Humano · Gestión salarial')}</div><h1>{T(titulo)}</h1><p>{T(bajada)}</p></div>",
         unsafe_allow_html=True,
     )
 
 
+def mostrar_dataframe(tabla, **kwargs):
+    tabla_visual = ui.translate_dataframe(tabla, UI_LANGUAGE)
+    column_config = kwargs.get("column_config")
+    if column_config and UI_LANGUAGE == "en":
+        kwargs["column_config"] = {T(label): config for label, config in column_config.items()}
+    st.dataframe(tabla_visual, **kwargs)
+
+
 def mostrar_tabla_escala(tabla):
-    st.dataframe(
+    mostrar_dataframe(
         tabla, width="stretch", hide_index=True, height=490,
         column_config={
             "Salario anterior Res. 29/2020 (CUP)": st.column_config.NumberColumn(format="$%.2f"),
@@ -1068,7 +1101,7 @@ def mostrar_tabla_escala(tabla):
 
 
 def mostrar_tabla_detalle(tabla):
-    st.dataframe(
+    mostrar_dataframe(
         tabla, width="stretch", hide_index=True, height=560,
         column_config={
             "Id.": st.column_config.NumberColumn(format="%.0f"),
@@ -1083,53 +1116,65 @@ def mostrar_tabla_detalle(tabla):
 def mostrar_importador_plantilla():
     plantilla_temporal = st.session_state.get("plantilla_importada")
     if plantilla_temporal:
-        st.warning(
-            f"Activa en esta sesión: {plantilla_temporal['filename']} · "
-            f"{len(plantilla_temporal['records'])} filas válidas · "
-            f"SHA-256 {plantilla_temporal['sha256'][:16]}… Las descargas salariales están bloqueadas.",
-            icon="⚠️",
-        )
-        if st.button("Volver a la plantilla oficial", key="restaurar_plantilla_oficial"):
+        if UI_LANGUAGE == "en":
+            mensaje_activa = (
+                f"Active in this session: {plantilla_temporal['filename']} · "
+                f"{len(plantilla_temporal['records'])} valid rows · "
+                f"SHA-256 {plantilla_temporal['sha256'][:16]}… Salary downloads are blocked."
+            )
+        else:
+            mensaje_activa = (
+                f"Activa en esta sesión: {plantilla_temporal['filename']} · "
+                f"{len(plantilla_temporal['records'])} filas válidas · "
+                f"SHA-256 {plantilla_temporal['sha256'][:16]}… Las descargas salariales están bloqueadas."
+            )
+        st.warning(mensaje_activa, icon="⚠️")
+        if st.button(T("Volver a la plantilla oficial"), key="restaurar_plantilla_oficial"):
             st.session_state.pop("plantilla_importada", None)
             st.rerun()
 
-    with st.expander("Importar otra plantilla para revisar", expanded=False):
-        st.caption(
+    with st.expander(T("Importar otra plantilla para revisar"), expanded=False):
+        st.caption(T(
             "Admite .xls y .xlsx sin macros (máximo 15 MiB). El archivo se analiza en memoria. "
             "La vista previa no lo activa ni modifica el archivo fuente."
-        )
+        ))
         uploaded = st.file_uploader(
-            "Seleccionar plantilla (.xls o .xlsx)",
+            T("Seleccionar plantilla (.xls o .xlsx)"),
             type=["xls", "xlsx"],
             key="subida_plantilla_calidad",
-            help="No se guardan archivos subidos en el repositorio ni en el disco del servidor.",
+            help=T("No se guardan archivos subidos en el repositorio ni en el disco del servidor."),
         )
         if uploaded is None:
             return
         resultado_importacion = base.validar_plantilla_subida(uploaded.name, uploaded.getvalue())
-        st.caption(
-            f"Archivo: {resultado_importacion['filename']} · "
-            f"{uploaded.size:,} bytes · SHA-256: {resultado_importacion['sha256']}"
-        )
+        st.caption(T(
+            "Archivo: {name} · {size} bytes · SHA-256: {digest}",
+            name=resultado_importacion["filename"],
+            size=f"{uploaded.size:,}",
+            digest=resultado_importacion["sha256"],
+        ))
         if resultado_importacion["validation"]:
-            st.dataframe(pd.DataFrame(resultado_importacion["validation"]), width="stretch", hide_index=True)
+            mostrar_dataframe(pd.DataFrame(resultado_importacion["validation"]), width="stretch", hide_index=True)
         if resultado_importacion["errors"]:
             for error in resultado_importacion["errors"]:
-                st.error(error)
+                st.error(T(error))
         if resultado_importacion["warnings"]:
             for warning in resultado_importacion["warnings"]:
-                st.warning(warning)
+                st.warning(T(warning))
         if resultado_importacion["preview"]:
-            st.subheader("Vista previa · primeras 25 filas válidas")
-            st.dataframe(pd.DataFrame(resultado_importacion["preview"]), width="stretch", hide_index=True)
+            st.subheader(T("Vista previa · primeras 25 filas válidas"))
+            mostrar_dataframe(pd.DataFrame(resultado_importacion["preview"]), width="stretch", hide_index=True)
         if resultado_importacion["findings"]:
-            st.caption(f"Hallazgos detectados: {len(resultado_importacion['findings'])}. Se conservan todas las filas del archivo.")
+            st.caption(T(
+                "Hallazgos detectados: {count}. Se conservan todas las filas del archivo.",
+                count=f"{len(resultado_importacion['findings']):,}",
+            ))
         if resultado_importacion["ready"]:
-            st.warning(
+            st.warning(T(
                 "Confirmar solo cambia los datos de esta sesión. No reemplaza la fuente oficial; "
                 "las descargas permanecen bloqueadas hasta aprobar formalmente la nueva fuente."
-            )
-            if st.button("Usar temporalmente en esta sesión", key="activar_plantilla_temporal"):
+            ))
+            if st.button(T("Usar temporalmente en esta sesión"), key="activar_plantilla_temporal"):
                 st.session_state["plantilla_importada"] = {
                     key: resultado_importacion[key]
                     for key in (
@@ -1143,76 +1188,88 @@ def mostrar_importador_plantilla():
 if vista == "Panel de control":
     encabezado("Panel de Control", "Resumen ejecutivo, validaciones y accesos directos para preparar la propuesta.")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Mínimo legal de referencia", "$3,210.00", "Grupo I · CUP")
-    c2.metric("Multiplicador seleccionado", f"{factor:.2f}×", "Rango permitido: 1–6×")
-    c3.metric("Cargos encontrados", f"{len(detalle_df):,}", f"{detalle_df['Grupo propuesto'].nunique()} grupos con propuesta")
-    c4.metric("Cambio total en los cargos", f"${variacion:,.2f}", "vs. salarios fuente")
+    c1.metric(T("Mínimo legal de referencia"), ui.format_currency(3210, UI_LANGUAGE), T("Grupo I · CUP"))
+    c2.metric(T("Multiplicador seleccionado"), f"{factor:.2f}×", T("Rango permitido: 1–6×"))
+    c3.metric(T("Cargos encontrados"), f"{len(detalle_df):,}", f"{detalle_df['Grupo propuesto'].nunique()} {T('grupos con propuesta')}")
+    c4.metric(T("Cambio total en los cargos"), ui.format_currency(variacion, UI_LANGUAGE), T("vs. salarios fuente"))
 
     left, right = st.columns([1.7, 1])
     with left:
-        st.subheader("Vista comparativa de la escala")
+        st.subheader(T("Vista comparativa de la escala"))
         grafico = propuesta_rows[[
             "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
         ]].set_index("Grupo").rename(columns={
-            "Escala oficial Res. 15/2026 (CUP)": "Oficial Res. 15/2026",
-            "Nueva propuesta (CUP)": f"Propuesta {factor:.2f}×",
+            "Escala oficial Res. 15/2026 (CUP)": T("Oficial Res. 15/2026"),
+            "Nueva propuesta (CUP)": f"{T('Propuesta')} {factor:.2f}×",
         })
         st.bar_chart(grafico, width="stretch", height=360)
-        st.caption("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII).")
+        st.caption(T("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII)."))
     with right:
-        st.subheader("Estado de revisión")
+        st.subheader(T("Estado de revisión"))
         fuentes_ok = base.RUTA_PLANTILLA.is_file() and base.RUTA_ESCALA_BASE.is_file()
-        st.markdown(f"<span class='ch-status'>{'● FUENTES DISPONIBLES' if fuentes_ok else '● REVISAR FUENTES'}</span>", unsafe_allow_html=True)
-        st.write(f"**Registros en plantilla:** {len(registros)}")
-        st.write(f"**Grupos cubiertos:** {', '.join(sorted(propuesta, key=lambda g: base.ROMANO_A_ENTERO[g]))}")
-        st.write(f"**Grupos sin propuesta:** {32 - len(propuesta)} de 32; conservan valores oficiales.")
-        st.write(f"**Control de tope:** {'Correcto' if detalle_df['Salario ajustado (CUP)'].le(detalle_df['Tope máximo 6× (CUP)'].round(2)).all() else 'ERROR'}")
-        st.write(f"**Discrepancias de origen:** {len(anomalias)} grupos con valores distintos.")
+        st.markdown(f"<span class='ch-status'>{T('● FUENTES DISPONIBLES' if fuentes_ok else '● REVISAR FUENTES')}</span>", unsafe_allow_html=True)
+        st.write(f"**{T('Registros en plantilla')}:** {len(registros)}")
+        st.write(f"**{T('Grupos cubiertos')}:** {', '.join(sorted(propuesta, key=lambda g: base.ROMANO_A_ENTERO[g]))}")
+        st.write(f"**{T('Grupos sin propuesta')}:** {32 - len(propuesta)} {T('de 32; conservan valores oficiales.')}")
+        control_tope_ok = detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all()
+        st.write(f"**{T('Control de tope')}:** {T('Correcto' if control_tope_ok else 'ERROR')}")
+        st.write(f"**{T('Discrepancias de origen')}:** {len(anomalias)} {T('grupos con valores distintos.')}")
     st.divider()
-    st.subheader("Acciones rápidas")
+    st.subheader(T("Acciones rápidas"))
     a1, a2, a3 = st.columns(3)
     with a1:
-        st.markdown("<div class='ch-card'><h3>📊 Revisar escala</h3><p>Consulta los 32 grupos, salarios oficiales y propuesta ajustada.</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='ch-card'><h3>{T('📊 Revisar escala')}</h3><p>{T('Consulta los 32 grupos, salarios oficiales y propuesta ajustada.')}</p></div>", unsafe_allow_html=True)
     with a2:
-        st.markdown("<div class='ch-card'><h3>👥 Auditar plantilla</h3><p>Id. correlativo, búsqueda y filtros conservan la referencia a hoja y fila de origen.</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='ch-card'><h3>{T('👥 Auditar plantilla')}</h3><p>{T('Id. correlativo, búsqueda y filtros conservan la referencia a hoja y fila de origen.')}</p></div>", unsafe_allow_html=True)
     with a3:
-        st.markdown("<div class='ch-card'><h3>📄 Preparar entregables</h3><p>Exporta el escenario activo a un libro Excel o PDF imprimible.</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='ch-card'><h3>{T('📄 Preparar entregables')}</h3><p>{T('Exporta el escenario activo a un libro Excel o PDF imprimible.')}</p></div>", unsafe_allow_html=True)
     if anomalias:
-        with st.expander("Observaciones detectadas en la fuente", expanded=False):
+        with st.expander(T("Observaciones detectadas en la fuente"), expanded=False):
             for nota in anomalias:
-                st.warning(nota)
+                st.warning(T(nota))
 
 elif vista == "Escala salarial":
-    encabezado("Escala Salarial", f"Escenario en vivo · multiplicador {factor:.2f}× · límite absoluto 6× de la base de origen.")
-    st.info("Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $3,210.00.")
+    encabezado("Escala Salarial", T("Escenario en vivo · multiplicador {factor}× · límite absoluto 6× de la base de origen.", factor=f"{factor:.2f}"))
+    st.info(T("Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $3,210.00."))
     mostrar_tabla_escala(escala_df)
-    with st.expander("Metodología y supuestos"):
-        st.markdown("""
-        - El multiplicador global se aplica al salario por cargo de la plantilla fuente.
-        - El tope de seis veces se comprueba individualmente en cada registro.
-        - Para la tabla consolidada de grupo se usa el valor mayoritario cuando el .xls contiene discrepancias.
-        - La tabla detallada conserva cada importe individual para auditoría.
-        - Los grupos ausentes en la plantilla no reciben importes inventados.
-        """)
+    with st.expander(T("Metodología y supuestos")):
+        if UI_LANGUAGE == "en":
+            st.markdown("""
+            - The global multiplier is applied to each position's source salary.
+            - The six-times cap is checked for every record.
+            - The consolidated group table uses the majority value when the .xls contains discrepancies.
+            - The detailed table retains every individual amount for audit.
+            - No values are invented for groups absent from the template.
+            """)
+        else:
+            st.markdown("""
+            - El multiplicador global se aplica al salario por cargo de la plantilla fuente.
+            - El tope de seis veces se comprueba individualmente en cada registro.
+            - Para la tabla consolidada de grupo se usa el valor mayoritario cuando el .xls contiene discrepancias.
+            - La tabla detallada conserva cada importe individual para auditoría.
+            - Los grupos ausentes en la plantilla no reciben importes inventados.
+            """)
 
 elif vista == "Comparar escenarios":
     encabezado("Comparar escenarios", "Contrasta dos factores en paralelo por grupo o por cargo, sin convertir la suma en un presupuesto de nómina.")
     ca, cb = st.columns(2)
-    factor_a = ca.slider("Escenario A · factor", 1.0, 6.0, 1.0, 0.05, format="%.2f×", key="comparador_a")
-    factor_b = cb.slider("Escenario B · factor", 1.0, 6.0, 1.5, 0.05, format="%.2f×", key="comparador_b")
-    grupo_tab, cargo_tab = st.tabs(["Resumen por grupo", "Detalle por cargo"])
+    factor_a = ca.slider(T("Escenario A · factor"), 1.0, 6.0, 1.0, 0.05, format="%.2f×", key="comparador_a")
+    factor_b = cb.slider(T("Escenario B · factor"), 1.0, 6.0, 1.5, 0.05, format="%.2f×", key="comparador_b")
+    grupo_tab, cargo_tab = st.tabs([T("Resumen por grupo"), T("Detalle por cargo")])
 
     with grupo_tab:
         comparacion_df = crear_comparacion_escenarios(factor_a, factor_b, propuesta, anterior)
         grupos_modificados = comparacion_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
         maxima_variacion = comparacion_df["Variación B − A (CUP)"].abs().max()
         k1, k2, k3 = st.columns(3)
-        k1.metric("Grupos con cambio", f"{grupos_modificados} de {len(comparacion_df)}")
-        k2.metric("Mayor cambio por grupo", f"${maxima_variacion:,.2f}")
-        k3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
-        grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]]
+        k1.metric(T("Grupos con cambio"), f"{grupos_modificados} {T('de')} {len(comparacion_df)}")
+        k2.metric(T("Mayor cambio por grupo"), ui.format_currency(maxima_variacion, UI_LANGUAGE))
+        k3.metric(T("Factores comparados"), f"{factor_a:.2f}× {T('vs.')} {factor_b:.2f}×")
+        grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]].rename(
+            columns={"Variación B − A (CUP)": T("Variación B − A (CUP)")}
+        )
         st.bar_chart(grafico_comparacion, width="stretch", height=350)
-        st.dataframe(
+        mostrar_dataframe(
             comparacion_df, width="stretch", hide_index=True,
             column_config={
                 "Escenario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
@@ -1221,15 +1278,15 @@ elif vista == "Comparar escenarios":
                 "Variación relativa": st.column_config.NumberColumn(format="percent"),
             },
         )
-        st.warning("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina.")
+        st.warning(T("La suma de importes por grupo no equivale al impacto total de nómina: no se dispone aquí de la cantidad de plazas ocupadas/vacantes por grupo. No uses esta comparación como presupuesto de nómina."))
         out_csv, out_xlsx = st.columns(2)
         csv_comparacion = crear_zip_csv_con_manifiesto(comparacion_df, "Comparacion_escenarios_grupo.csv", manifiesto)
         with out_csv:
-            st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_grupo.zip", "application/zip", width="stretch", disabled=descargas_deshabilitadas())
+            st.download_button(T("Descargar CSV + manifiesto (.zip)"), csv_comparacion, "Comparacion_escenarios_grupo.zip", "application/zip", width="stretch", disabled=descargas_deshabilitadas())
         with out_xlsx:
             xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b, manifiesto)
             st.download_button(
-                "Descargar comparación Excel", xlsx_comparacion,
+                T("Descargar comparación Excel"), xlsx_comparacion,
                 f"Comparacion_escenarios_grupo_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch",
@@ -1241,10 +1298,10 @@ elif vista == "Comparar escenarios":
         cargos_modificados = comparacion_cargos_df["Variación B − A (CUP)"].abs().gt(0.005).sum()
         maximo_cambio_cargo = comparacion_cargos_df["Variación B − A (CUP)"].abs().max() if not comparacion_cargos_df.empty else 0
         d1, d2, d3 = st.columns(3)
-        d1.metric("Cargos con cambio", f"{cargos_modificados} de {len(comparacion_cargos_df)}")
-        d2.metric("Mayor cambio por cargo", f"${maximo_cambio_cargo:,.2f}")
-        d3.metric("Factores comparados", f"{factor_a:.2f}× vs. {factor_b:.2f}×")
-        st.dataframe(
+        d1.metric(T("Cargos con cambio"), f"{cargos_modificados} {T('de')} {len(comparacion_cargos_df)}")
+        d2.metric(T("Mayor cambio por cargo"), ui.format_currency(maximo_cambio_cargo, UI_LANGUAGE))
+        d3.metric(T("Factores comparados"), f"{factor_a:.2f}× {T('vs.')} {factor_b:.2f}×")
+        mostrar_dataframe(
             comparacion_cargos_df, width="stretch", hide_index=True,
             column_config={
                 "Id.": st.column_config.NumberColumn(format="%.0f"),
@@ -1258,14 +1315,14 @@ elif vista == "Comparar escenarios":
                 "Variación relativa": st.column_config.NumberColumn(format="percent"),
             },
         )
-        st.warning("Esta comparación es por cargo y no calcula costo total de nómina. Los dos salarios de cada fila respetan el tope absoluto de 6× la fuente.")
+        st.warning(T("Esta comparación es por cargo y no calcula costo total de nómina. Los dos salarios de cada fila respetan el tope absoluto de 6× la fuente."))
         detalle_csv, detalle_xlsx = st.columns(2)
         paquete_detalle_csv = crear_zip_csv_con_manifiesto(
             comparacion_cargos_df, "Comparacion_escenarios_por_cargo.csv", manifiesto
         )
         with detalle_csv:
             st.download_button(
-                "Descargar CSV por cargo + manifiesto (.zip)", paquete_detalle_csv,
+                T("Descargar CSV por cargo + manifiesto (.zip)"), paquete_detalle_csv,
                 "Comparacion_escenarios_por_cargo.zip", "application/zip", width="stretch",
                 disabled=descargas_deshabilitadas(),
             )
@@ -1274,7 +1331,7 @@ elif vista == "Comparar escenarios":
                 comparacion_cargos_df, factor_a, factor_b, manifiesto
             )
             st.download_button(
-                "Descargar comparación por cargo Excel", detalle_xlsx_bytes,
+                T("Descargar comparación por cargo Excel"), detalle_xlsx_bytes,
                 f"Comparacion_escenarios_cargos_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch",
@@ -1284,65 +1341,74 @@ elif vista == "Comparar escenarios":
 elif vista == "Plantilla por cargo":
     encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
     mostrar_importador_plantilla()
-    st.subheader("Calidad de la fuente")
+    st.subheader(T("Calidad de la fuente"))
     hallazgos_df = pd.DataFrame(hallazgos_calidad)
     conteo_hallazgos = (
         hallazgos_df["Tipo de incidencia"].value_counts().to_dict()
         if not hallazgos_df.empty else {}
     )
     q1, q2, q3, q4, q5 = st.columns(5)
-    q1.metric("Registros válidos", f"{len(registros):,}")
-    q2.metric("Salarios ausentes", int(conteo_hallazgos.get("Salario ausente", 0)))
-    q3.metric("Salarios inválidos", int(conteo_hallazgos.get("Salario inválido", 0)))
-    q4.metric("Posibles duplicados", int(conteo_hallazgos.get("Posible duplicado", 0)))
-    q5.metric("Discrepancias", int(conteo_hallazgos.get("Discrepancia salarial de grupo", 0)))
+    q1.metric(T("Registros válidos"), f"{len(registros):,}")
+    q2.metric(T("Salarios ausentes"), int(conteo_hallazgos.get("Salario ausente", 0)))
+    q3.metric(T("Salarios inválidos"), int(conteo_hallazgos.get("Salario inválido", 0)))
+    q4.metric(T("Posibles duplicados"), int(conteo_hallazgos.get("Posible duplicado", 0)))
+    q5.metric(T("Discrepancias"), int(conteo_hallazgos.get("Discrepancia salarial de grupo", 0)))
     if hallazgos_df.empty:
-        st.success("No se detectaron incidencias en las filas con grupo válido. Esto no sustituye la revisión humana de la fuente.")
+        st.success(T("No se detectaron incidencias en las filas con grupo válido. Esto no sustituye la revisión humana de la fuente."))
     else:
-        st.warning(
-            f"Se detectaron {len(hallazgos_df):,} incidencias para revisar. "
-            "Este diagnóstico no corrige, elimina ni modifica filas de la fuente. "
-            "La escala consolidada mantiene la regla actual del valor mayoritario ante discrepancias."
-        )
-        st.dataframe(hallazgos_df, width="stretch", hide_index=True)
-        st.subheader("Revisión manual de incidencias")
-        st.caption("El estado y la nota se conservan durante esta sesión y en la descarga; no se escriben en la plantilla original ni en los archivos fuente.")
-        revision_calidad_df = st.data_editor(
-            st.session_state["revision_calidad_actual"],
-            width="stretch", hide_index=True, key="editor_revision_calidad",
-            disabled=[
-                "ID incidencia", "Tipo de incidencia", "Hoja de origen", "Fila de origen",
-                "Cargo", "Grupo", "Valor detectado", "Detalle",
-            ],
+        st.warning(T(
+            "Se detectaron {count} incidencias para revisar. Este diagnóstico no corrige, elimina ni modifica filas de la fuente. La escala consolidada mantiene la regla actual del valor mayoritario ante discrepancias.",
+            count=f"{len(hallazgos_df):,}",
+        ))
+        mostrar_dataframe(hallazgos_df, width="stretch", hide_index=True)
+        st.subheader(T("Revisión manual de incidencias"))
+        st.caption(T("El estado y la nota se conservan durante esta sesión y en la descarga; no se escriben en la plantilla original ni en los archivos fuente."))
+        revision_para_editar = ui.translate_dataframe(st.session_state["revision_calidad_actual"], UI_LANGUAGE)
+        campos_bloqueados = [
+            "ID incidencia", "Tipo de incidencia", "Hoja de origen", "Fila de origen",
+            "Cargo", "Grupo", "Valor detectado", "Detalle",
+        ]
+        opciones_estado = ["Pendiente", "En revisión", "Revisada", "No aplica"]
+        revision_editada = st.data_editor(
+            revision_para_editar,
+            width="stretch", hide_index=True, key=f"editor_revision_calidad_{UI_LANGUAGE}",
+            disabled=[T(campo) for campo in campos_bloqueados],
             column_config={
-                "Estado de revisión": st.column_config.SelectboxColumn(
-                    "Estado de revisión",
-                    options=["Pendiente", "En revisión", "Revisada", "No aplica"],
+                T("Estado de revisión"): st.column_config.SelectboxColumn(
+                    T("Estado de revisión"),
+                    options=[T(estado) for estado in opciones_estado],
                     required=True,
                 ),
-                "Nota de revisión": st.column_config.TextColumn(
-                    "Nota de revisión", max_chars=500,
+                T("Nota de revisión"): st.column_config.TextColumn(
+                    T("Nota de revisión"), max_chars=500,
                 ),
             },
         )
+        revision_calidad_df = revision_editada
+        if UI_LANGUAGE == "en":
+            columnas_origen = st.session_state["revision_calidad_actual"].columns
+            nombres_es = {T(columna): columna for columna in columnas_origen}
+            revision_calidad_df = revision_calidad_df.rename(columns=nombres_es)
+            estados_es = {T(estado): estado for estado in opciones_estado}
+            revision_calidad_df["Estado de revisión"] = revision_calidad_df["Estado de revisión"].map(estados_es).fillna("Pendiente")
         st.session_state["revision_calidad_actual"] = revision_calidad_df.copy()
         paquete_calidad = crear_zip_csv_con_manifiesto(
             revision_calidad_df, "Incidencias_calidad_revisadas.csv", manifiesto
         )
         st.download_button(
-            "Descargar incidencias + manifiesto (.zip)", paquete_calidad,
+            T("Descargar incidencias + manifiesto (.zip)"), paquete_calidad,
             "Incidencias_calidad_plantilla.zip", "application/zip",
             key="descargar_incidencias_calidad",
             disabled=descargas_deshabilitadas(),
         )
-    st.caption("Cada hallazgo incluye hoja y fila. Un posible duplicado coincide en hoja, grupo, cargo y salario: puede ser una plaza legítima repetida, por lo que se conserva hasta revisión humana.")
+    st.caption(T("Cada hallazgo incluye hoja y fila. Un posible duplicado coincide en hoja, grupo, cargo y salario: puede ser una plaza legítima repetida, por lo que se conserva hasta revisión humana."))
     st.divider()
     f1, f2, f3 = st.columns([1, 1, 2])
     grupos = sorted(detalle_df["Grupo propuesto"].unique(), key=lambda g: base.ROMANO_A_ENTERO[g])
     hojas = sorted(detalle_df["Hoja de origen"].unique())
-    filtro_grupo = f1.multiselect("Grupo", grupos, placeholder="Todos los grupos")
-    filtro_hoja = f2.multiselect("Hoja fuente", hojas, placeholder="Todas las hojas")
-    busqueda = f3.text_input("Buscar cargo", placeholder="Ej.: director, técnico, operador…")
+    filtro_grupo = f1.multiselect(T("Grupo"), grupos, placeholder=T("Todos los grupos"))
+    filtro_hoja = f2.multiselect(T("Hoja fuente"), hojas, placeholder=T("Todas las hojas"))
+    busqueda = f3.text_input(T("Buscar cargo"), placeholder=T("Ej.: director, técnico, operador…"))
     filtrada = detalle_df.copy()
     if filtro_grupo:
         filtrada = filtrada[filtrada["Grupo propuesto"].isin(filtro_grupo)]
@@ -1351,35 +1417,35 @@ elif vista == "Plantilla por cargo":
     if busqueda.strip():
         filtrada = filtrada[filtrada["Cargo"].str.contains(busqueda.strip(), case=False, regex=False, na=False)]
     m1, m2, m3 = st.columns(3)
-    m1.metric("Registros visibles", f"{len(filtrada):,}")
-    m2.metric("Salario fuente total", f"${filtrada['Salario original (CUP)'].sum():,.2f}")
-    m3.metric("Propuesta calculada", f"${filtrada['Salario ajustado (CUP)'].sum():,.2f}")
+    m1.metric(T("Registros visibles"), f"{len(filtrada):,}")
+    m2.metric(T("Salario fuente total"), ui.format_currency(filtrada["Salario original (CUP)"].sum(), UI_LANGUAGE))
+    m3.metric(T("Propuesta calculada"), ui.format_currency(filtrada["Salario ajustado (CUP)"].sum(), UI_LANGUAGE))
     mostrar_tabla_detalle(filtrada)
     csv = crear_zip_csv_con_manifiesto(filtrada, "Plantilla_Resolucion87_filtrada.csv", manifiesto)
     st.download_button(
-        "Descargar filtro CSV + manifiesto (.zip)", csv,
+        T("Descargar filtro CSV + manifiesto (.zip)"), csv,
         "Plantilla_Resolucion87_filtrada.zip", "application/zip",
         disabled=descargas_deshabilitadas(),
     )
 
 elif vista == "Exportaciones":
     encabezado("Exportar y presentar", "Valida el escenario antes de preparar documentos consistentes para revisión.")
-    st.write(f"**Escenario activo:** {factor:.2f}× · **Cargos:** {len(detalle_df)} · **Fecha:** {date.today():%d/%m/%Y}")
-    st.info("Excel, PDF e informe de aprobación se generan desde la misma escala, detalle, factor y manifiesto. El informe de aprobación permanece como borrador.")
+    st.write(f"**{T('Escenario activo')}:** {factor:.2f}× · **{T('Cargos')}:** {len(detalle_df)} · **{T('Fecha')}:** {ui.format_date(date.today(), UI_LANGUAGE)}")
+    st.info(T("Excel, PDF e informe de aprobación se generan desde la misma escala, detalle, factor y manifiesto. El informe de aprobación permanece como borrador."))
     preflight_df, exportacion_lista = validar_preexportacion(
         escala_df, detalle_df, factor, manifiesto, len(registros)
     )
-    st.subheader("Comprobaciones previas a la descarga")
-    st.dataframe(preflight_df, width="stretch", hide_index=True)
+    st.subheader(T("Comprobaciones previas a la descarga"))
+    mostrar_dataframe(preflight_df, width="stretch", hide_index=True)
     if not exportacion_lista:
-        st.error("Las descargas quedan bloqueadas hasta corregir las comprobaciones marcadas como ERROR. No se modificó ninguna fuente.")
+        st.error(T("Las descargas quedan bloqueadas hasta corregir las comprobaciones marcadas como ERROR. No se modificó ninguna fuente."))
     else:
         if hallazgos_calidad:
-            st.warning(
-                f"Hay {len(hallazgos_calidad)} incidencias de calidad pendientes de revisión. "
-                "Puedes descargar los informes para revisión, pero no interpretes su generación como resolución de esas incidencias."
-            )
-        with st.spinner("Preparando los archivos para descarga…"):
+            st.warning(T(
+                "Hay {count} incidencias de calidad pendientes de revisión. Puedes descargar los informes para revisión, pero no interpretes su generación como resolución de esas incidencias.",
+                count=f"{len(hallazgos_calidad):,}",
+            ))
+        with st.spinner(T("Preparando los archivos para descarga…")):
             excel_bytes = crear_excel(escala_df, detalle_df, factor, manifiesto)
             pdf_bytes = crear_pdf(escala_df, detalle_df, factor, manifiesto)
             informe_aprobacion_bytes = crear_informe_aprobacion_pdf(
@@ -1387,24 +1453,24 @@ elif vista == "Exportaciones":
             )
         e1, e2, e3 = st.columns(3)
         with e1:
-            st.markdown("<div class='ch-card'><h3>📗 Libro Excel</h3><p>32 grupos, formatos y detalle completo de la plantilla fuente.</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='ch-card'><h3>{T('📗 Libro Excel')}</h3><p>{T('32 grupos, formatos y detalle completo de la plantilla fuente.')}</p></div>", unsafe_allow_html=True)
             st.download_button(
-                "Descargar Excel (.xlsx)", excel_bytes,
+                T("Descargar Excel (.xlsx)"), excel_bytes,
                 f"Propuesta_Escala_Resolucion87_{factor:.2f}x.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch",
             )
         with e2:
-            st.markdown("<div class='ch-card'><h3>📕 Informe PDF</h3><p>Escala resumida, detalle paginado y página de trazabilidad.</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='ch-card'><h3>{T('📕 Informe PDF')}</h3><p>{T('Escala resumida, detalle paginado y página de trazabilidad.')}</p></div>", unsafe_allow_html=True)
             st.download_button(
-                "Descargar PDF imprimible", pdf_bytes,
+                T("Descargar PDF imprimible"), pdf_bytes,
                 f"Propuesta_Escala_Resolucion87_{factor:.2f}x.pdf",
                 "application/pdf", width="stretch",
             )
         with e3:
-            st.markdown("<div class='ch-card'><h3>📝 Informe para aprobación</h3><p>Metodología, resumen por grupo, fuentes y espacios para decisión y firmas manuscritas.</p></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='ch-card'><h3>{T('📝 Informe para aprobación')}</h3><p>{T('Metodología, resumen por grupo, fuentes y espacios para decisión y firmas manuscritas.')}</p></div>", unsafe_allow_html=True)
             st.download_button(
-                "Descargar borrador de aprobación",
+                T("Descargar borrador de aprobación"),
                 informe_aprobacion_bytes,
                 f"Informe_Aprobacion_Capital_Humano_{factor:.2f}x.pdf",
                 "application/pdf", width="stretch",
@@ -1418,17 +1484,17 @@ elif vista == "Exportaciones":
             st.session_state.get("revision_calidad_actual", revision_calidad_base),
             manifiesto,
         )
-        st.subheader("Paquete completo para revisión")
-        st.caption("Incluye los tres documentos, parámetros del escenario, incidencias con revisión manual, manifiesto de fuentes y un inventario SHA-256 de todos los demás archivos del paquete.")
+        st.subheader(T("Paquete completo para revisión"))
+        st.caption(T("Incluye los tres documentos, parámetros del escenario, incidencias con revisión manual, manifiesto de fuentes y un inventario SHA-256 de todos los demás archivos del paquete."))
         st.download_button(
-            "Descargar paquete completo (.zip)",
+            T("Descargar paquete completo (.zip)"),
             paquete_completo,
             f"Paquete_Capital_Humano_{factor:.2f}x.zip",
             "application/zip",
             width="stretch",
             key="descargar_paquete_completo",
         )
-        st.caption(f"Versión {version_visible} · integridad verificada · el informe de aprobación permanece marcado como borrador.")
+        st.caption(T("Versión {version} · integridad verificada · el informe de aprobación permanece marcado como borrador.", version=version_visible))
 
 elif vista == "Sistema y HTTPS":
     encabezado("Sistema y seguridad", "Comprobaciones de las fuentes, del entorno de ejecución y del canal seguro.")
@@ -1439,13 +1505,13 @@ elif vista == "Sistema y HTTPS":
         request_headers = {}
     proxy_tls = request_headers.get("x-forwarded-proto", "").lower() == "https"
     cert_file_ok = bool(ssl_cert and Path(ssl_cert).is_file())
-    tls_state = "HTTPS confirmado por proxy" if proxy_tls else ("Certificado TLS nativo configurado" if cert_file_ok else "No confirmado por esta sesión")
+    tls_state = T("HTTPS confirmado por proxy") if proxy_tls else (T("Certificado TLS nativo configurado") if cert_file_ok else T("No confirmado por esta sesión"))
     q1, q2, q3, q4 = st.columns(4)
-    q1.metric("Canal", tls_state)
-    q2.metric("Plantilla fuente", "Disponible" if base.RUTA_PLANTILLA.is_file() else "No encontrada")
-    q3.metric("Escala histórica", "Disponible" if base.RUTA_ESCALA_BASE.is_file() else "No encontrada")
-    q4.metric("Integridad SHA-256", "Verificada" if manifiesto.get("integrity_ok") else "Revisar")
-    st.markdown("#### Información de ejecución")
+    q1.metric(T("Canal"), tls_state)
+    q2.metric(T("Plantilla fuente"), T("Disponible" if base.RUTA_PLANTILLA.is_file() else "No encontrada"))
+    q3.metric(T("Escala histórica"), T("Disponible" if base.RUTA_ESCALA_BASE.is_file() else "No encontrada"))
+    q4.metric(T("Integridad SHA-256"), T("Verificada" if manifiesto.get("integrity_ok") else "Revisar"))
+    st.markdown(f"#### {T('Información de ejecución')}")
     sys_df = pd.DataFrame([
         {"Comprobación": "Versión de Capital Humano", "Resultado": version_visible},
         {"Comprobación": "Integridad de fuentes", "Resultado": "Verificada" if manifiesto.get("integrity_ok") else "Revisión requerida"},
@@ -1457,46 +1523,55 @@ elif vista == "Sistema y HTTPS":
         {"Comprobación": "Proxy HTTPS", "Resultado": "Detectado" if proxy_tls else "No detectado"},
         {"Comprobación": "Validación de tope 6×", "Resultado": "Correcta" if detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all() else "Revisar"},
     ])
-    st.dataframe(sys_df, width="stretch", hide_index=True)
-    st.markdown("#### Huellas SHA-256 de fuentes y código")
+    mostrar_dataframe(sys_df, width="stretch", hide_index=True)
+    st.markdown(f"#### {T('Huellas SHA-256 de fuentes y código')}")
     if manifiesto.get("integrity_ok"):
-        st.success("Todos los archivos supervisados coinciden byte a byte con las huellas aprobadas del manifiesto.")
+        st.success(T("Todos los archivos supervisados coinciden byte a byte con las huellas aprobadas del manifiesto."))
     else:
-        st.error("Una fuente, el manifiesto o el código no coincide con la versión registrada; valida el cambio antes de distribuir informes.")
+        st.error(T("Una fuente, el manifiesto o el código no coincide con la versión registrada; valida el cambio antes de distribuir informes."))
         if manifiesto.get("error"):
             st.caption(manifiesto["error"])
     manifest_df = pd.DataFrame(manifiesto.get("sources", []))
     if not manifest_df.empty:
-        st.dataframe(
+        mostrar_dataframe(
             manifest_df, width="stretch", hide_index=True,
             column_config={
-                "expected_sha256": st.column_config.TextColumn("SHA-256 aprobado", width="large"),
-                "actual_sha256": st.column_config.TextColumn("SHA-256 actual", width="large"),
-                "size_bytes": st.column_config.NumberColumn("Tamaño (bytes)", format="localized"),
+                "expected_sha256": st.column_config.TextColumn(T("SHA-256 aprobado"), width="large"),
+                "actual_sha256": st.column_config.TextColumn(T("SHA-256 actual"), width="large"),
+                "size_bytes": st.column_config.NumberColumn(T("Tamaño (bytes)"), format="localized"),
             },
         )
-    st.caption("Para actualizar el manifiesto tras un cambio autorizado, revisa primero la nueva fuente y ejecuta: python tools/actualizar_manifiesto_fuentes.py. El hash no sustituye revisión normativa ni firma digital.")
-    st.warning("HTTPS cifra y autentica el servidor; no sustituye controles de acceso a nivel de aplicación. Para uso público, usa Caddy + Let's Encrypt y autenticación Basic configurada en el despliegue. No expongas directamente el puerto 8501.")
+    st.caption(T("Para actualizar el manifiesto tras un cambio autorizado, revisa primero la nueva fuente y ejecuta: python tools/actualizar_manifiesto_fuentes.py. El hash no sustituye revisión normativa ni firma digital."))
+    st.warning(T("HTTPS cifra y autentica el servidor; no sustituye controles de acceso a nivel de aplicación. Para uso público, usa Caddy + Let's Encrypt y autenticación Basic configurada en el despliegue. No expongas directamente el puerto 8501."))
     if os.name == "nt":
         control_script = CARPETA / "control_app.ps1"
-        st.markdown("#### Inicio automático HTTPS en Windows")
+        st.markdown(f"#### {T('Inicio automático HTTPS en Windows')}")
         if control_script.is_file():
-            st.success("Está disponible el controlador de inicio/estado de la app.")
+            st.success(T("Está disponible el controlador de inicio/estado de la app."))
             st.code(".\\control_app.ps1 -Accion instalar-autoinicio\n.\\control_app.ps1 -Accion estado\n.\\control_app.ps1 -Accion detener\n.\\control_app.ps1 -Accion quitar-autoinicio", language="powershell")
-            st.caption("El inicio automático se programa al iniciar sesión del mismo usuario; la CA mkcert debe instalarse una vez en ese perfil.")
+            st.caption(T("El inicio automático se programa al iniciar sesión del mismo usuario; la CA mkcert debe instalarse una vez en ese perfil."))
         else:
-            st.info("El control de inicio automático se habilita con el script de gestión de Windows incluido en esta versión.")
+            st.info(T("El control de inicio automático se habilita con el script de gestión de Windows incluido en esta versión."))
     else:
-        st.markdown("#### Autoarranque del servidor")
-        st.info("En Windows usa el programador de tareas del script de control. En servidores Linux, se recomienda el despliegue Docker Compose con Caddy y políticas de reinicio; certificados persistentes en el volumen caddy_data.")
-    with st.expander("Recomendaciones operativas"):
-        st.markdown("""
-        - Actualiza Python y las dependencias desde un entorno virtual x64 (Windows).
-        - No compartas `.certs`, claves privadas, `deploy/.env` ni credenciales.
-        - En producción publica solo 80/443 mediante Caddy; no abras 8501 a Internet.
-        - Comprueba HTTPS desde el navegador y que la fecha/hostname coincida con el certificado.
-        - Conserva copia de seguridad y restringe el acceso al repositorio si contiene datos sensibles.
-        """)
+        st.markdown(f"#### {T('Autoarranque del servidor')}")
+        st.info(T("En Windows usa el programador de tareas del script de control. En servidores Linux, se recomienda el despliegue Docker Compose con Caddy y políticas de reinicio; certificados persistentes en el volumen caddy_data."))
+    with st.expander(T("Recomendaciones operativas")):
+        if UI_LANGUAGE == "en":
+            st.markdown("""
+            - Update Python and dependencies in an x64 virtual environment (Windows).
+            - Do not share `.certs`, private keys, `deploy/.env`, or credentials.
+            - In production, expose only ports 80/443 through Caddy; do not expose 8501 to the Internet.
+            - Check HTTPS in the browser and confirm the certificate date and hostname.
+            - Keep backups and restrict repository access if it contains sensitive data.
+            """)
+        else:
+            st.markdown("""
+            - Actualiza Python y las dependencias desde un entorno virtual x64 (Windows).
+            - No compartas `.certs`, claves privadas, `deploy/.env` ni credenciales.
+            - En producción publica solo 80/443 mediante Caddy; no abras 8501 a Internet.
+            - Comprueba HTTPS desde el navegador y que la fecha/hostname coincida con el certificado.
+            - Conserva copia de seguridad y restringe el acceso al repositorio si contiene datos sensibles.
+            """)
 
 elif vista == "Mejoras futuras":
     encabezado("Próximas mejoras", "Selecciona prioridades para orientar la siguiente versión; esta selección se procesa localmente y no se envía a ningún servidor.")
@@ -1511,19 +1586,24 @@ elif vista == "Mejoras futuras":
         "Programar copias de seguridad y actualización de la escala",
         "Indicadores de nómina a partir de plazas autorizadas y verificadas",
         "Mejoras de accesibilidad y experiencia móvil (WCAG)",
-        "Interfaz en inglés con referencias legales cubanas intactas",
         "Firma digital verificable de releases e informes con claves protegidas",
     ]
-    seleccionadas = st.multiselect("¿Qué mejoras priorizarías?", opciones, placeholder="Selecciona una o varias")
-    prioridad = st.select_slider("Prioridad global", options=["Baja", "Media", "Alta", "Urgente"], value="Media")
-    comentarios = st.text_area("Otras ideas o requisitos", placeholder="Describe los cambios que necesitas en futuras versiones…")
-    resumen = ["SUGERENCIAS DE MEJORA · CAPITAL HUMANO", "", f"Prioridad: {prioridad}", "", "Mejoras seleccionadas:"]
-    resumen += [f"- {x}" for x in seleccionadas] or ["- No se seleccionaron opciones."]
-    resumen += ["", "Comentarios:", comentarios.strip() or "(sin comentarios)", ""]
-    st.download_button("Descargar lista de mejoras (.txt)", "\n".join(resumen), "Mejoras_Capital_Humano.txt", "text/plain")
-    st.markdown("#### Ideas recomendadas por impacto")
-    st.markdown("1. **Guardar y recuperar escenarios** para comparar decisiones aprobadas.\n2. **Presupuesto real** solo cuando exista un registro autorizado de plazas ocupadas/vacantes.\n3. **Roles individuales y bitácora** antes de permitir colaboración con datos salariales.\n4. **Trazabilidad de fuentes y aprobación** en los informes imprimibles.")
-    st.caption("Consulta criterios de aceptación y prioridades completas en la [hoja de ruta de Capital Humano](https://github.com/yhquintero/Capital_Humanos/blob/main/docs/ROADMAP.md). No adjuntes datos personales ni salarios reales a propuestas públicas de GitHub.")
+    opciones_visibles = [T(item) for item in opciones]
+    seleccionadas_visibles = st.multiselect(T("¿Qué mejoras priorizarías?"), opciones_visibles, placeholder=T("Selecciona una o varias"))
+    prioridades = ["Baja", "Media", "Alta", "Urgente"]
+    prioridad_visible = st.select_slider(T("Prioridad global"), options=[T(item) for item in prioridades], value=T("Media"))
+    prioridad = next(item for item in prioridades if T(item) == prioridad_visible)
+    comentarios = st.text_area(T("Otras ideas o requisitos"), placeholder=T("Describe los cambios que necesitas en futuras versiones…"))
+    resumen = [T("SUGERENCIAS DE MEJORA · CAPITAL HUMANO"), "", f"{T('Prioridad')}: {T(prioridad)}", "", T("Mejoras seleccionadas:")]
+    resumen += [f"- {item}" for item in seleccionadas_visibles] or [f"- {T('No se seleccionaron opciones.')}"]
+    resumen += ["", T("Comentarios:"), comentarios.strip() or T("(sin comentarios)"), ""]
+    st.download_button(T("Descargar lista de mejoras (.txt)"), "\n".join(resumen), "Mejoras_Capital_Humano.txt", "text/plain")
+    st.markdown(f"#### {T('Ideas recomendadas por impacto')}")
+    if UI_LANGUAGE == "en":
+        st.markdown("1. **Save and restore scenarios** for approved decisions.\n2. **Real budget impact** only when authorized occupied/vacant-position data exists.\n3. **Individual roles and audit log** before collaboration on salary data.\n4. **Source traceability and approval** in printable reports.")
+    else:
+        st.markdown("1. **Guardar y recuperar escenarios** para comparar decisiones aprobadas.\n2. **Presupuesto real** solo cuando exista un registro autorizado de plazas ocupadas/vacantes.\n3. **Roles individuales y bitácora** antes de permitir colaboración con datos salariales.\n4. **Trazabilidad de fuentes y aprobación** en los informes imprimibles.")
+    st.caption(T("Consulta criterios de aceptación y prioridades completas en la hoja de ruta de Capital Humano. No adjuntes datos personales ni salarios reales a propuestas públicas de GitHub."))
 
 st.markdown("---")
-st.markdown(f"<div class='ch-muted'>Capital Humano · versión {version_visible} · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='ch-muted'>{T('Capital Humano · versión {version} · herramienta de modelación y apoyo. Validar normativa e importes antes de aplicar una propuesta salarial.', version=version_visible)}</div>", unsafe_allow_html=True)
