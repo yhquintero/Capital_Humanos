@@ -3,11 +3,6 @@
 {$DOMINIO} {
 	encode zstd gzip
 
-	# Requiere contraseña Basic Auth (hash bcrypt/argon2 generado por Caddy).
-	basic_auth {
-		{$APP_USER} {$APP_PASSWORD_HASH}
-	}
-
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
@@ -15,6 +10,22 @@
 		-Server
 	}
 
-	# Caddy también gestiona el WebSocket que Streamlit utiliza para su UI.
-	reverse_proxy app:8501
+	# Sonda mínima pública para monitorización; no devuelve datos de la app.
+	route {
+		@health path /healthz
+		handle @health {
+			header Cache-Control "no-store"
+			rewrite * /_stcore/health
+			reverse_proxy app:8501
+		}
+
+		handle {
+			# Requiere contraseña Basic Auth (hash bcrypt/argon2 generado por Caddy).
+			basic_auth {
+				{$APP_USER} {$APP_PASSWORD_HASH}
+			}
+			# Caddy también gestiona el WebSocket que Streamlit utiliza para su UI.
+			reverse_proxy app:8501
+		}
+	}
 }
