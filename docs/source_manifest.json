@@ -35,15 +35,15 @@
       "id": "interfaz_app",
       "label": "Código de la aplicación y exportadores",
       "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
-      "size_bytes": 86598,
-      "sha256": "a1265bf80ec4739c98cdcb3f33f245b4feca10d51398a30ae29704743dff8c9a"
+      "size_bytes": 94485,
+      "sha256": "088c7deb79c61645d383e50274c06ad832c1ea77caa0aac3c6601a26847daa34"
     },
     {
       "id": "interfaz_traducciones",
       "label": "Traducciones de interfaz",
       "path": "TES/Salariales/Nueva Escala 3210/i18n.py",
-      "size_bytes": 29946,
-      "sha256": "71729a568aed5a4db9f2f3f146731609ea1f60bd64c7907cafa377a2e3e02533"
+      "size_bytes": 31613,
+      "sha256": "59f7a9f84adf88ef662b68dc9b969406e98288e302d0dab597d9f2efb2b0ea7f"
     },
     {
       "id": "actualizador_manifest",
