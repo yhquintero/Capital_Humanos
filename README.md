@@ -1,16 +1,22 @@
+<a id="top"></a>
+
 <div align="center">
 
-<img src="docs/capital_humano_banner.svg" width="100%" alt="Capital Humano — escala salarial interactiva, mínimo $3,210 CUP, ajuste en vivo 1 a 6 veces y exportación PDF y Excel" />
+<img src="docs/capital_humano_banner.svg" width="100%" alt="Capital Humano — escala salarial interactiva, mínimo $ 3,210.00 CUP, ajuste en vivo 1 a 6 veces y exportación PDF y Excel" />
 
 ### Escala salarial interactiva · propuesta de plantilla · exportación PDF y Excel
 
-Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partiendo del salario mínimo de **$3,210.00 CUP** y respetando un máximo de **6× el salario original** de cada cargo.
+Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partiendo del salario mínimo de **$ 3,210.00 CUP** y respetando un máximo de **6× el salario original** de cada cargo.
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](TES/Salariales/Nueva%20Escala%203210/README.md)
 [![Excel](https://img.shields.io/badge/Exportaci%C3%B3n-Excel%20%7C%20PDF-16866B?style=flat-square)](TES/Salariales/Nueva%20Escala%203210/)
 [![HTTPS](https://img.shields.io/badge/HTTPS-Caddy%20%2B%20Let's%20Encrypt-1C7C54?style=flat-square)](docs/HTTPS.md)
 [![CI](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yhquintero/Capital_Humanos/actions/workflows/ci.yml)
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-E6B85C?style=flat-square)](#-alcance-y-validación)
+
+[Accesibilidad](docs/ACCESSIBILITY.md) · [Contribuir](CONTRIBUTING.md) · [Seguridad](SECURITY.md)
+
+> **Licencia:** pendiente de definición. No se ha añadido un archivo `LICENSE`.
 
 **[Abrir la guía de uso](TES/Salariales/Nueva%20Escala%203210/README.md) · [Ver el Excel de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.xlsx) · [Ver el PDF de ejemplo](TES/Salariales/Nueva%20Escala%203210/Escala_Salarial_3210_Nueva.pdf)**
 
@@ -24,7 +30,7 @@ Herramienta para revisar y ajustar la propuesta salarial de la plantilla, partie
 - Permite cambiar en **tiempo real** un multiplicador común de **1.00× a 6.00×**.
 - Calcula y muestra para cada cargo el salario original, el multiplicador, el tope y el importe ajustado.
 - Aplica un control explícito: **el salario ajustado no puede superar 6× el salario base del cargo en la plantilla fuente**.
-- Mantiene anclado el **grupo I en $3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
+- Mantiene anclado el **grupo I en $ 3,210.00**; los grupos sin propuesta de cargos conservan la escala oficial de 44 horas.
 - Incluye un panel ejecutivo, auditoría filtrable por cargo, comparación de dos escenarios por grupo y un diagnóstico de calidad de plantilla que marca salarios vacíos/no válidos, posibles duplicados y discrepancias con hoja/fila sin corregir la fuente.
 - Exporta escala, detalle y trazabilidad SHA-256 a **Excel (.xlsx)** y **PDF A4 horizontal**; las exportaciones CSV incluyen un manifiesto JSON en el ZIP.
 
@@ -100,7 +106,7 @@ El control se aplica a cada salario propuesto de la plantilla; el tope se verifi
 
 | Dato | Fuente |
 |---|---|
-| Salario mínimo mensual de $3,210.00 | Resolución 14/2026, GOC-2026-393-O60 |
+| Salario mínimo mensual de $ 3,210.00 | Resolución 14/2026, GOC-2026-393-O60 |
 | Escala oficial de 32 grupos, jornada de 44 horas | Resolución 15/2026, GOC-2026-394-O60 |
 | Salario histórico | `TES/Salariales/Escala 3210_OK.xlsx` (Res. 29/2020) |
 | Grupo, cargo y salario propuesto | `Nueva Estructura de Plantilla/Organigrama/propuesta de plantilla por la resolucion 87.xls` |
@@ -155,4 +161,4 @@ La herramienta facilita el análisis y la preparación de una propuesta; no sust
 
 ---
 
-<div align="center"><sub>Capital Humano · Escala salarial y plantilla · Cuba</sub></div>
+<div align="center"><sub>Capital Humano · Escala salarial y plantilla · Cuba</sub> · <a href="#top" aria-label="Volver al inicio" title="Volver al inicio">⬆️</a></div>

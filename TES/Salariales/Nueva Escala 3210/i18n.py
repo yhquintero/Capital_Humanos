@@ -1,4 +1,4 @@
-"""Traducciones de interfaz y formato visual; no altera fuentes ni exportaciones oficiales."""
+"""Traducciones y formato de presentación; no modifica fuentes ni cálculos numéricos."""
 from __future__ import annotations
 
 import math
@@ -19,7 +19,7 @@ ENGLISH = {'Panel de control': 'Dashboard',
  'Multiplicador común': 'Common multiplier',
  'Se aplica por cargo. El límite técnico nunca excede seis veces el salario de origen.': 'Applied per position. The technical cap never exceeds six times the source salary.',
  'Tope permitido': 'Maximum allowed',
- 'El grupo I mantiene el mínimo oficial de $3,210.00 CUP.': 'Group I retains the official minimum of CUP 3,210.00.',
+ 'El grupo I mantiene el mínimo oficial de $ 3,210.00 CUP.': 'Group I retains the official minimum of $ 3,210.00 CUP.',
  'Fuentes activas': 'Active sources',
  'No se pudo cargar la plantilla de origen: {error}': 'Could not load the source template: {error}',
  'Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.': 'Check that the template .xls and historical scale are in the repository. If the paths are correct, see the troubleshooting guide in the README.',
@@ -58,7 +58,7 @@ ENGLISH = {'Panel de control': 'Dashboard',
  '📄 Preparar entregables': '📄 Prepare deliverables',
  'Exporta el escenario activo a un libro Excel o PDF imprimible.': 'Export the active scenario to an Excel workbook or printable PDF.',
  'Observaciones detectadas en la fuente': 'Source observations',
- 'Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $3,210.00.': 'Groups with a proposal are recalculated from template salaries. Groups without one retain the official Resolution 15/2026 scale; Group I remains at CUP 3,210.00.',
+ 'Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $ 3,210.00.': 'Groups with a proposal are recalculated from template salaries. Groups without one retain the official Resolution 15/2026 scale; Group I remains at $ 3,210.00.',
  'Metodología y supuestos': 'Methodology and assumptions',
  'Contrasta dos factores en paralelo por grupo o por cargo, sin convertir la suma en un presupuesto de nómina.': 'Compare two factors side by side by group or position; the sum is not a payroll budget.',
  'Resumen por grupo': 'Group summary',
@@ -380,11 +380,7 @@ def format_currency(value: float, language: str = "es", *, decimals: int = 2) ->
     amount = float(value)
     if not math.isfinite(amount):
         return "—"
-    if language.casefold() in {"en", "english"}:
-        return f"CUP {amount:,.{decimals}f}"
-    formatted = f"{amount:,.{decimals}f}"
-    formatted = formatted.replace(",", "\u202f").replace(".", ",")
-    return f"{formatted} CUP"
+    return f"$ {amount:,.{decimals}f}"
 
 
 def format_date(value: date, language: str = "es") -> str:

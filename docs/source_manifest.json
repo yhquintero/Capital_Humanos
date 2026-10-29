@@ -28,22 +28,22 @@
       "id": "motor_calculo",
       "label": "Código de extracción y cálculo",
       "path": "TES/Salariales/Nueva Escala 3210/generar_escala.py",
-      "size_bytes": 51670,
-      "sha256": "d79e204d448ac03bac1dac0e8dbc831ee2e3cdf0aceff26bb7323458f7e981c2"
+      "size_bytes": 51656,
+      "sha256": "de0bf4986d5886dd0a51ede02a663fa0f5a0955b0156f13083396380d11c05b1"
     },
     {
       "id": "interfaz_app",
       "label": "Código de la aplicación y exportadores",
       "path": "TES/Salariales/Nueva Escala 3210/app_escala.py",
-      "size_bytes": 94485,
-      "sha256": "088c7deb79c61645d383e50274c06ad832c1ea77caa0aac3c6601a26847daa34"
+      "size_bytes": 94529,
+      "sha256": "96d4aa8d3cfdaeee40d8a154a7a324e78ebe2ec3e81867d7a02f3ec524ad5436"
     },
     {
       "id": "interfaz_traducciones",
       "label": "Traducciones de interfaz",
       "path": "TES/Salariales/Nueva Escala 3210/i18n.py",
-      "size_bytes": 31613,
-      "sha256": "59f7a9f84adf88ef662b68dc9b969406e98288e302d0dab597d9f2efb2b0ea7f"
+      "size_bytes": 31418,
+      "sha256": "5fca7870d83ad14bf547298513d6f08bad9cc3a752da1c5e328d7f8889dd3d62"
     },
     {
       "id": "actualizador_manifest",

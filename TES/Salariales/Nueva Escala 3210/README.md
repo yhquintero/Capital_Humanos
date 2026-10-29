@@ -7,7 +7,7 @@ Herramienta Python para recalcular la escala salarial y preparar una propuesta i
 - Slider en vivo entre **1× y 6×**, en pasos de 0.05.
 - Aplicación del factor por cargo a cada salario extraído de la plantilla.
 - Validación estricta por fila: `salario ajustado ≤ salario original × 6`.
-- Mínimo del grupo I fijado en **$3,210.00 CUP** (Res. 14/2026).
+- Mínimo del grupo I fijado en **$ 3,210.00 CUP** (Res. 14/2026).
 - Grupos con propuesta recalculados; los demás conservan la escala oficial Res. 15/2026 (44 h).
 - Comparación de dos escenarios simultáneos, por grupo, con exportación CSV/Excel.
 - Exportación de la escala activa a **Excel `.xlsx`** y **PDF A4 horizontal** con página de trazabilidad.
@@ -117,11 +117,11 @@ python -m pip install -r requirements.txt
 - Las descargas Excel/PDF y CSV de detalle anteponen un Id. correlativo a la hoja de origen, conservado al filtrar para contar y rastrear cada ítem; los valores faltantes aparecen en blanco, no como `None`.
 - Las descargas Excel/PDF de la app contienen la escala y los cargos con el multiplicador seleccionado; el informe de aprobación separado contiene un resumen por grupo, metodología, hashes y campos para revisión humana.
 - El informe de aprobación se marca como borrador hasta completar manualmente las revisiones y firmas; no contiene una aprobación digital ni estima el gasto total de nómina.
-- Res. 14/2026, GOC-2026-393-O60: salario mínimo mensual de $3,210.00.
+- Res. 14/2026, GOC-2026-393-O60: salario mínimo mensual de $ 3,210.00.
 - Res. 15/2026, GOC-2026-394-O60: escala oficial de 32 grupos, jornada de 44 horas.
 - `Escala 3210_OK.xlsx`: escala histórica Res. 29/2020.
 - `propuesta de plantilla por la resolucion 87.xls`: cargos y salarios de origen.
 
-El tope se verifica por cargo: `salario ajustado ≤ salario original × 6`. Los cargos sin salario propuesto conservan el salario oficial y el grupo I permanece anclado en $3,210.00. Dos discrepancias de origen aparecen en los grupos XII y XV; la interfaz mantiene el detalle por fila para su revisión. Validar cualquier propuesta antes de aprobarla.
+El tope se verifica por cargo: `salario ajustado ≤ salario original × 6`. Los cargos sin salario propuesto conservan el salario oficial y el grupo I permanece anclado en $ 3,210.00. Dos discrepancias de origen aparecen en los grupos XII y XV; la interfaz mantiene el detalle por fila para su revisión. Validar cualquier propuesta antes de aprobarla.
 
 Para entender o actualizar las huellas SHA-256 de las fuentes, sigue la [guía de trazabilidad](../../../docs/TRAZABILIDAD_FUENTES.md). No regeneres el manifiesto para silenciar una discrepancia que no haya sido revisada.

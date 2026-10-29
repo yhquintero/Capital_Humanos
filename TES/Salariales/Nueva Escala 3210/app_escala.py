@@ -135,7 +135,7 @@ def crear_tablas(factor, propuesta, registros, anterior):
             fuente = "Plantilla Resolución 87"
         else:
             # Los grupos sin cargos propuestos conservan la escala oficial vigente;
-            # el mínimo del grupo I queda anclado en $3,210.
+            # el mínimo del grupo I queda anclado en $ 3,210.
             salario_base = f["oficial"]
             techo = salario_base * base.FACTOR_MAXIMO_ABSOLUTO
             salario = salario_base
@@ -244,7 +244,7 @@ def crear_excel_comparacion_cargos(comparacion: pd.DataFrame, factor_a: float, f
             cell.alignment = Alignment(vertical="center", wrap_text=cell.column in (2, 4))
         for index, nombre in enumerate(comparacion.columns, start=1):
             if "CUP" in nombre:
-                row[index - 1].number_format = '"$"#,##0.00;[Red]-"$"#,##0.00'
+                row[index - 1].number_format = '"$ "#,##0.00;[Red]"$ "-#,##0.00'
             elif nombre.startswith("Factor "):
                 row[index - 1].number_format = '0.00"×"'
             elif nombre == "Variación relativa":
@@ -309,7 +309,7 @@ def crear_excel_comparacion(comparacion: pd.DataFrame, factor_a: float, factor_b
             cell.border = Border(bottom=edge)
             cell.alignment = Alignment(vertical="center", wrap_text=cell.column in (1, 6))
         for index in (2, 3, 4):
-            row[index - 1].number_format = '"$"#,##0.00'
+            row[index - 1].number_format = '"$ "#,##0.00'
         row[4].number_format = "0.00%"
     for column, width in enumerate((13, 22, 22, 24, 22, 45), start=1):
         ws.column_dimensions[chr(64 + column)].width = width
@@ -606,7 +606,7 @@ def _estilizar_hoja(
             cell.border = Border(bottom=edge)
             cell.alignment = Alignment(vertical="center", wrap_text=cell.column in wrap_cols)
             if cell.column in money_cols and isinstance(cell.value, (int, float)):
-                cell.number_format = '"$"#,##0.00'
+                cell.number_format = '"$ "#,##0.00'
             elif cell.column in factor_cols and isinstance(cell.value, (int, float)):
                 cell.number_format = '0.00"×"'
     if last_row > header_row:
@@ -678,7 +678,7 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
                 if _es_vacio(value):
                     text = ""
                 elif isinstance(value, (int, float)) and idx in money_cols:
-                    text = f"${value:,.2f}"
+                    text = f"$ {value:,.2f}"
                 elif isinstance(value, (int, float)) and idx in factor_cols:
                     text = f"{value:.2f}×"
                 elif isinstance(value, float):
@@ -692,12 +692,12 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
             pdf.ln(height)
 
     pdf.add_page()
-    cabecera("NUEVA ESCALA SALARIAL", f"Mínimo $3,210.00 · Factor de plantilla {factor:.2f}× · Tope absoluto 6× del salario base · CUP")
+    cabecera("NUEVA ESCALA SALARIAL", f"Mínimo $ 3,210.00 · Factor de plantilla {factor:.2f}× · Tope absoluto 6× del salario base · CUP")
     cols = ["Grupo", "Anterior\nRes. 29/2020", "Oficial\nRes. 15/2026", "Base", "Factor", "Tope 6×", "Nueva propuesta", "Fuente"]
     tabla(escala, cols, [14, 30, 30, 30, 18, 30, 31, 51], {1, 2, 3, 5, 6}, factor_cols={4})
     pdf.ln(2)
     pdf.set_font("DejaVu", "", 8)
-    pdf.multi_cell(0, 4.5, "El grupo I conserva el salario mínimo oficial de $3,210.00. Los grupos sin propuesta de cargos conservan la escala oficial. La tabla detallada siguiente aplica el factor a cada salario de la plantilla fuente y limita cada resultado a seis veces ese salario.")
+    pdf.multi_cell(0, 4.5, "El grupo I conserva el salario mínimo oficial de $ 3,210.00. Los grupos sin propuesta de cargos conservan la escala oficial. La tabla detallada siguiente aplica el factor a cada salario de la plantilla fuente y limita cada resultado a seis veces ese salario.")
     pdf.add_page()
     cabecera("PLANTILLA PROPUESTA · DETALLE DE CARGOS", f"Fuente: propuesta de plantilla por la resolución 87.xls · {len(detalle)} cargos · Factor {factor:.2f}×")
     det_cols = ["Id.", "Hoja", "Fila", "Cargo", "Grupo", "Original", "Factor", "Tope 6×", "Ajustado"]
@@ -797,7 +797,7 @@ def crear_informe_aprobacion_pdf(
     paragraph(
         "Para los grupos con cargos propuestos, el cálculo es min(salario de origen × factor, salario de origen × 6). "
         "El factor seleccionado se aplica por cargo y nunca supera el límite absoluto de 6×. El grupo I conserva "
-        "el salario mínimo de la Resolución 14/2026 ($3,210.00 CUP); los grupos sin propuesta conservan la "
+        "el salario mínimo de la Resolución 14/2026 ($ 3,210.00 CUP); los grupos sin propuesta conservan la "
         "escala oficial de la Resolución 15/2026 para 44 horas. Las firmas y la decisión se completan "
         "manualmente en la página 3."
     )
@@ -834,9 +834,9 @@ def crear_informe_aprobacion_pdf(
             else:
                 values = (
                     str(item["Grupo"]),
-                    f"${item['Base propuesta / referencia (CUP)']:,.2f}",
+                    f"$ {item['Base propuesta / referencia (CUP)']:,.2f}",
                     f"{item['Factor aplicado']:.2f}×",
-                    f"${item['Nueva propuesta (CUP)']:,.2f}",
+                    f"$ {item['Nueva propuesta (CUP)']:,.2f}",
                 )
             for value, width in zip(values, widths[:4]):
                 pdf.cell(width, 6.3, value, border=1, align="R" if value.startswith("$") else "C", new_x="RIGHT", new_y="TOP")
@@ -859,7 +859,7 @@ def crear_informe_aprobacion_pdf(
     heading("Supuestos y límites")
     for assumption in (
         "La propuesta se extrae de la plantilla asociada a la Resolución 87; los salarios oficiales y referencias normativas deben ser confirmados por el área responsable.",
-        "Los grupos sin cargos propuestos no se multiplican: conservan la escala oficial de la Resolución 15/2026 (44 horas). El grupo I permanece en $3,210.00 CUP según la Resolución 14/2026.",
+        "Los grupos sin cargos propuestos no se multiplican: conservan la escala oficial de la Resolución 15/2026 (44 horas). El grupo I permanece en $ 3,210.00 CUP según la Resolución 14/2026.",
         f"El factor usado en este escenario es {factor:.2f}×. Cada resultado propuesto queda limitado a seis veces su salario fuente.",
         "No se calcula el impacto presupuestario total: no se dispone del conteo autorizado de plazas ocupadas/vacantes ni de componentes de nómina.",
         "Una huella SHA-256 coincidente detecta igualdad de bytes frente al manifiesto; no es firma digital ni prueba vigencia o validez jurídica.",
@@ -1072,7 +1072,7 @@ with st.sidebar:
         help=T("Se aplica por cargo. El límite técnico nunca excede seis veces el salario de origen."),
     )
     st.metric(T("Tope permitido"), "6.00×")
-    st.caption(T("El grupo I mantiene el mínimo oficial de $3,210.00 CUP."))
+    st.caption(T("El grupo I mantiene el mínimo oficial de $ 3,210.00 CUP."))
     st.divider()
     fuentes_etiqueta = (
         "Res. 14/2026 · Res. 15/2026 (44 h) · proposed template .xls"
@@ -1140,11 +1140,11 @@ def mostrar_tabla_escala(tabla):
     mostrar_dataframe(
         tabla, width="stretch", hide_index=True, height=490,
         column_config={
-            "Salario anterior Res. 29/2020 (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Escala oficial Res. 15/2026 (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Base propuesta / referencia (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Tope máximo (6× base) (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Nueva propuesta (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Salario anterior Res. 29/2020 (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Escala oficial Res. 15/2026 (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Base propuesta / referencia (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Tope máximo (6× base) (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Nueva propuesta (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
             "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
         },
     )
@@ -1155,9 +1155,9 @@ def mostrar_tabla_detalle(tabla):
         tabla, width="stretch", hide_index=True, height=560,
         column_config={
             "Id.": st.column_config.NumberColumn(format="%.0f"),
-            "Salario original (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Tope máximo 6× (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-            "Salario ajustado (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+            "Salario original (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Tope máximo 6× (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+            "Salario ajustado (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
             "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
         },
     )
@@ -1327,7 +1327,7 @@ if vista == "Panel de control":
 
 elif vista == "Escala salarial":
     encabezado("Escala Salarial", T("Escenario en vivo · multiplicador {factor}× · límite absoluto 6× de la base de origen.", factor=f"{factor:.2f}"))
-    st.info(T("Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $3,210.00."))
+    st.info(T("Los grupos con propuesta se recalculan desde los salarios del archivo de plantilla. Los grupos sin propuesta conservan la escala oficial de la Resolución 15/2026; el grupo I permanece en $ 3,210.00."))
     mostrar_tabla_escala(escala_df)
     with st.expander(T("Metodología y supuestos")):
         if UI_LANGUAGE == "en":
@@ -1369,9 +1369,9 @@ elif vista == "Comparar escenarios":
         mostrar_dataframe(
             comparacion_df, width="stretch", hide_index=True,
             column_config={
-                "Escenario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                "Escenario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Escenario A (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+                "Escenario B (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
                 "Variación relativa": st.column_config.NumberColumn(format="percent"),
             },
         )
@@ -1403,12 +1403,12 @@ elif vista == "Comparar escenarios":
             column_config={
                 "Id.": st.column_config.NumberColumn(format="%.0f"),
                 "Fila de origen": st.column_config.NumberColumn(format="%.0f"),
-                "Salario fuente (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                "Salario A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
-                "Salario B (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Salario fuente (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+                "Salario A (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
+                "Salario B (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
                 "Factor A": st.column_config.NumberColumn(format="%.2f×"),
                 "Factor B": st.column_config.NumberColumn(format="%.2f×"),
-                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$%.2f"),
+                "Variación B − A (CUP)": st.column_config.NumberColumn(format="$ %,.2f"),
                 "Variación relativa": st.column_config.NumberColumn(format="percent"),
             },
         )
