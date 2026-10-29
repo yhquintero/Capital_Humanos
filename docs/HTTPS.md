@@ -1,6 +1,6 @@
 # HTTPS, certificados y acceso seguro
 
-La aplicación se puede ejecutar de dos maneras. **Para que el navegador valide un certificado como perteneciente a un sitio público, hace falta un dominio propio** que apunte al servidor. No se puede emitir un certificado público confiable para `localhost` o para una IP privada.
+La aplicación se puede ejecutar de dos maneras. **Para que el navegador valide un certificado como perteneciente a un sitio público, hace falta un dominio propio** que apunte al servidor. No se puede emitir un certificado público confiable para `localhost` o para una IP privada. Para operación, monitorización externa y respuesta ante incidentes, consulta también el [runbook](RUNBOOK_OPERACION.md).
 
 ## Opción recomendada para un servidor público: Caddy + Let's Encrypt
 
