@@ -125,6 +125,43 @@ def test_quality_page_shows_clean_state_after_authorized_source_review():
     assert not any("incidencias + manifiesto" in label for label in labels)
 
 
+def test_temporary_import_is_marked_unapproved_and_disables_salary_downloads():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    app_test.session_state["plantilla_importada"] = {
+        "filename": "temporal.xlsx",
+        "sha256": "a" * 64,
+        "size_bytes": 128,
+        "proposal": {"I": 3210.0},
+        "counters": {},
+        "records": [{
+            "hoja": "Hoja de prueba", "fila": 2, "cargo": "Cargo de prueba",
+            "grupo": "I", "salario": 3210.0,
+        }],
+        "anomalies": [],
+        "findings": [],
+    }
+    app_test.radio[0].set_value("Comparar escenarios").run(timeout=60)
+    assert not app_test.exception
+    assert app_test.download_button
+    assert all(button.disabled for button in app_test.download_button)
+    assert any("Plantilla temporal activa" in warning.value for warning in app_test.warning)
+
+    app_test.radio[0].set_value("Exportaciones").run(timeout=60)
+    assert not app_test.exception
+    assert app_test.download_button == []
+    assert any("descargas quedan bloqueadas" in error.value for error in app_test.error)
+
+    app_test.radio[0].set_value("Sistema y HTTPS").run(timeout=60)
+    assert not app_test.exception
+    sources = app_test.dataframe[-1].value
+    assert "NO APROBADA · SOLO SESIÓN" in set(sources["status"])
+
+    app_test.radio[0].set_value("Plantilla por cargo").run(timeout=60)
+    assert any(button.label == "Volver a la plantilla oficial" for button in app_test.button)
+    assert any(button.label == "Usar temporalmente en esta sesión" for button in app_test.button) is False
+    assert all(button.disabled for button in app_test.download_button)
+
+
 def test_filtered_csv_is_packaged_with_source_manifest():
     app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
     _assert_page_runs(app_test, "Plantilla por cargo")

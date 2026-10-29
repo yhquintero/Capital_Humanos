@@ -17,6 +17,7 @@ Cambios funcionales y de operación, organizados por versión.
 - Añadido un informe A4 para revisión y aprobación humana, con método, resumen por grupo, trazabilidad completa y campos manuales de decisión/firma; se marca siempre como borrador.
 - Corregida la posición de los encabezados del resumen por grupo en el informe de aprobación PDF para alinearlos con las columnas de datos.
 - Iniciada CH-06 con foco visible, contraste de texto secundario y ajustes de reflujo; las pruebas manuales con navegador y lector de pantalla siguen pendientes.
+- Iniciada CH-09: importación temporal .xls/.xlsx con vista previa y validaciones; la activación es explícita, no modifica fuentes y bloquea exportaciones no aprobadas.
 - En curso: diagnóstico auditable de calidad de plantilla con hallazgos por hoja/fila, conservando la fuente sin autocorrecciones.
 - Corregido el pie del PDF de plantilla para que no fuerce saltos de página ni se superponga al encabezado de “PLANTILLA PROPUESTA · DETALLE DE CARGOS”.
 

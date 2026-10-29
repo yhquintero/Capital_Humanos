@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -451,6 +451,103 @@ def test_active_scenario_excel_and_pdf_include_traceability(app_namespace):
     assert all(f"Página {number} de {len(pdf_pages)}" in text for number, text in enumerate(page_texts, start=1))
     assert "Id." in pdf_text and "Hoja" in pdf_text
     assert manifest["sources"][0]["actual_sha256"] in pdf_text
+
+
+def _xlsx_template_bytes(rows):
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "Plantilla nueva"
+    worksheet.append(["Cargo", "G.E.A", "Salario Propuesto"])
+    for row in rows:
+        worksheet.append(row)
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
+
+
+def test_uploaded_xlsx_is_only_previewed_until_explicit_confirmation():
+    payload = _xlsx_template_bytes([
+        ["Analista principal", "I", 3210],
+        ["Especialista técnico", "II", 3365],
+    ])
+    result = payroll.validar_plantilla_subida("nueva.xlsx", payload)
+
+    assert result["ready"] is True
+    assert result["record_count"] == 2
+    assert result["preview"] == result["records"]
+    assert result["proposal"] == {"I": 3210.0, "II": 3365.0}
+    assert result["size_bytes"] == len(payload)
+    assert len(result["sha256"]) == 64
+    assert result["errors"] == []
+
+
+def test_uploaded_template_preserves_possible_duplicates_and_blocks_bad_salaries():
+    duplicate_payload = _xlsx_template_bytes([
+        ["Especialista principal", "I", 3210],
+        ["Especialista principal", "I", 3210],
+    ])
+    duplicate_result = payroll.validar_plantilla_subida("repetida.xlsx", duplicate_payload)
+    assert duplicate_result["ready"] is True
+    assert len(duplicate_result["records"]) == 2
+    assert any("posibles duplicados" in warning for warning in duplicate_result["warnings"])
+    assert any(finding["Tipo de incidencia"] == "Posible duplicado" for finding in duplicate_result["findings"])
+
+    invalid_payload = _xlsx_template_bytes([
+        ["Salario cero", "I", 0],
+        ["Salario vacío", "II", None],
+    ])
+    invalid_result = payroll.validar_plantilla_subida("invalida.xlsx", invalid_payload)
+    assert invalid_result["ready"] is False
+    assert invalid_result["record_count"] == 0
+    assert sum(finding["Tipo de incidencia"] in {"Salario ausente", "Salario inválido"} for finding in invalid_result["findings"]) == 2
+    assert any("salario ausente o inválido" in error for error in invalid_result["errors"])
+
+
+def test_uploaded_template_rejects_books_without_expected_group_columns():
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(["Cargo", "Grupo", "Importe"])
+    worksheet.append(["Analista", "I", 3210])
+    output = BytesIO()
+    workbook.save(output)
+
+    result = payroll.validar_plantilla_subida("sin_columnas.xlsx", output.getvalue())
+    assert result["ready"] is False
+    assert result["template_sheets"] == 0
+    assert any("encabezados G.E." in error for error in result["errors"])
+
+
+def test_uploaded_template_rejects_unsupported_malformed_and_oversized_files():
+    assert not payroll.validar_plantilla_subida("plantilla.csv", b"data")["ready"]
+    malformed = payroll.validar_plantilla_subida("plantilla.xlsx", b"not an xlsx")
+    assert not malformed["ready"]
+    assert malformed["errors"]
+    oversized = payroll.validar_plantilla_subida(
+        "plantilla.xls", b"\x00" * (payroll.MAX_PLANTILLA_UPLOAD_BYTES + 1)
+    )
+    assert not oversized["ready"]
+    assert any("15 MiB" in error for error in oversized["errors"])
+
+
+def test_uploaded_xlsx_rejects_extreme_compression_ratio():
+    payload = BytesIO()
+    with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("xl/worksheets/sheet1.xml", "0" * 40_000)
+    result = payroll.validar_plantilla_subida("comprimida.xlsx", payload.getvalue())
+    assert result["ready"] is False
+    assert any("compresión permitido" in error for error in result["errors"])
+
+
+def test_uploaded_xls_preview_reads_all_source_rows_without_mutating_the_workbook():
+    source = payroll.RUTA_PLANTILLA.read_bytes()
+    before = payroll._sha256(payroll.RUTA_PLANTILLA)
+    result = payroll.validar_plantilla_subida(payroll.RUTA_PLANTILLA.name, source)
+
+    assert result["ready"] is True
+    assert result["record_count"] == 183
+    assert result["sha256"] == before
+    assert payroll._sha256(payroll.RUTA_PLANTILLA) == before
 
 
 def test_missing_values_are_blank_in_detail_excel_and_pdf(app_namespace):
