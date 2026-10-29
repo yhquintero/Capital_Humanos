@@ -20,7 +20,8 @@ Cambios funcionales y de operación, organizados por versión.
 - Iniciada CH-09: importación temporal .xls/.xlsx con vista previa y validaciones; la activación es explícita, no modifica fuentes y bloquea exportaciones no aprobadas.
 - Iniciada CH-12: endpoint público de salud mínimo, sonda externa con estado JSON/código de salida y runbook de diagnóstico sin registrar cuerpos ni datos salariales.
 - Añadida interfaz ES/EN con formatos regionales para moneda/fecha; la traducción se limita a presentación y las referencias legales/datos fuente permanecen en español (PR #24).
-- Rediseñado el panel ejecutivo con tarjetas KPI, paleta clara azul/cian, gráfico comparativo y anillo de cobertura de grupos; se destaca que el impacto total de nómina no se estima sin plazas autorizadas (CH-22, en curso).
+- Rediseñado el panel ejecutivo con tarjetas KPI alineadas, navegación azul noche/cian, controles rápidos funcionales, gráficos configurables por desglose y tipo, ejes/valores monetarios con formato exacto y persistencia de scroll por pestaña (CH-22, revisión en curso).
+- Documentados los perfiles iniciales de CH-08 (administración, RR. HH., Finanzas y consulta/auditoría) como borrador no activo; autenticación, matriz detallada de permisos y autorización de servidor siguen pendientes.
 - En curso: diagnóstico auditable de calidad de plantilla con hallazgos por hoja/fila, conservando la fuente sin autocorrecciones.
 - Corregido el pie del PDF de plantilla para que no fuerce saltos de página ni se superponga al encabezado de “PLANTILLA PROPUESTA · DETALLE DE CARGOS”.
 

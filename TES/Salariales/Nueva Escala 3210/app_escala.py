@@ -15,6 +15,7 @@ import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
@@ -989,26 +990,36 @@ NAV = [
 
 st.markdown("""
 <style>
-:root{color-scheme:light;--ch-navy:#102b4e;--ch-blue:#164b7a;--ch-cyan:#26b7d0;--ch-teal:#0f766e;--ch-ink:#1d2b3a;--ch-muted:#586b7f;--ch-border:#dfe8f0;--ch-canvas:#f4f8fc;--ch-rose:#b83748;--ch-amber:#9a5c08}
-html,body,[data-testid="stAppViewContainer"]{background:var(--ch-canvas);color:var(--ch-ink)}
-.block-container{padding-top:1.1rem;padding-bottom:3rem;max-width:1500px}
-[data-testid="stSidebar"]{background:#f8fbfe;border-right:1px solid var(--ch-border)}
-[data-testid="stSidebar"] [data-testid="stMetric"]{background:#fff;border:1px solid var(--ch-border);padding:.6rem .75rem;border-radius:13px}
-[data-testid="stMetric"]{background:#fff;border:1px solid var(--ch-border);border-radius:14px;padding:.85rem 1rem;box-shadow:0 3px 12px rgba(16,43,78,.045);min-height:96px}
+:root{color-scheme:light;--ch-navy:#10234f;--ch-blue:#2251a2;--ch-cyan:#26b7d0;--ch-teal:#0f766e;--ch-ink:#19283c;--ch-muted:#586b7f;--ch-border:#dce5f2;--ch-canvas:#f1f5fc;--ch-rose:#b83748;--ch-amber:#9a5c08;--ch-violet:#7351cb}
+html,body,[data-testid="stAppViewContainer"]{background:radial-gradient(ellipse at 92% 0%,rgba(86,164,255,.10),transparent 32rem),var(--ch-canvas);color:var(--ch-ink)}
+.block-container{padding-top:1.25rem;padding-bottom:3.5rem;max-width:1540px}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#111d46 0%,#0b1637 54%,#08122d 100%);border-right:1px solid rgba(157,185,255,.18);box-shadow:12px 0 34px rgba(16,35,79,.10)}
+[data-testid="stSidebarContent"]{height:100vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"], [data-testid="stSidebar"] [data-testid="stWidgetLabel"], [data-testid="stSidebar"] label{color:#e5edff}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"], [data-testid="stSidebar"] small{color:#b8c7e8!important}
+[data-testid="stSidebar"] hr{border-color:rgba(194,213,255,.22)}
+[data-testid="stSidebar"] [data-testid="stRadio"] label{border:1px solid transparent;border-radius:10px;padding:.35rem .55rem;transition:background .18s ease,border-color .18s ease}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover{background:rgba(103,153,255,.14);border-color:rgba(138,179,255,.24)}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked){background:linear-gradient(100deg,#2864d7,#397fe8);border-color:rgba(180,211,255,.48);box-shadow:0 5px 18px rgba(40,100,215,.26);color:#fff}
+[data-testid="stSidebar"] [data-testid="stMetric"]{background:linear-gradient(145deg,#fff,#f3f7ff);border:1px solid rgba(196,214,247,.8);padding:.6rem .75rem;border-radius:13px}
+[data-testid="stMetric"]{background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(248,251,255,.96));border:1px solid var(--ch-border);border-radius:16px;padding:.9rem 1rem;box-shadow:0 8px 22px rgba(23,50,100,.055);min-height:100px;transition:transform .18s ease,box-shadow .18s ease}
+[data-testid="stMetric"]:hover,.ch-kpi:hover,.ch-card:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(35,75,145,.11)}
 [data-testid="stMetricLabel"]{color:#52677b;font-weight:600}
 [data-testid="stMetricValue"]{color:var(--ch-navy);font-variant-numeric:tabular-nums;font-weight:750}
-.ch-hero{background:#fff;border:1px solid var(--ch-border);border-left:5px solid var(--ch-cyan);padding:1.2rem 1.55rem;border-radius:15px;color:var(--ch-navy);margin-bottom:1.15rem;box-shadow:0 4px 18px rgba(16,43,78,.045)}
-.ch-hero h1{color:var(--ch-navy);font-size:clamp(1.65rem,2.5vw,2.15rem);line-height:1.15;margin:0;font-weight:760}.ch-hero p{color:#53677b;margin:.4rem 0 0;font-size:.98rem}
-.ch-kicker{font-size:.72rem;letter-spacing:.11em;text-transform:uppercase;color:#087f8d;font-weight:750;margin-bottom:.34rem}
-.ch-card{border:1px solid var(--ch-border);background:#fff;border-radius:15px;padding:1rem 1.1rem;height:100%;box-shadow:0 4px 15px rgba(16,43,78,.035)}
+.ch-hero{position:relative;overflow:hidden;background:linear-gradient(112deg,#fff 0%,#f5f8ff 54%,#eef7ff 100%);border:1px solid rgba(202,218,244,.94);border-left:5px solid var(--ch-cyan);padding:1.35rem 1.6rem;border-radius:18px;color:var(--ch-navy);margin-bottom:1.2rem;box-shadow:0 10px 30px rgba(23,50,100,.07)}
+.ch-hero::after{content:"";position:absolute;right:-3rem;top:-5rem;width:16rem;height:16rem;border-radius:50%;background:radial-gradient(circle,rgba(38,183,208,.14),rgba(115,81,203,.05) 55%,transparent 70%);pointer-events:none}
+.ch-hero h1{position:relative;color:var(--ch-navy);font-size:clamp(1.75rem,2.7vw,2.3rem);line-height:1.13;margin:0;font-weight:780;letter-spacing:-.025em}.ch-hero p{position:relative;color:#53677b;margin:.45rem 0 0;font-size:.98rem}
+.ch-kicker{font-size:.72rem;letter-spacing:.13em;text-transform:uppercase;color:#087f8d;font-weight:780;margin-bottom:.36rem}
+.ch-card{border:1px solid rgba(205,219,242,.92);background:linear-gradient(145deg,#fff,#f9fbff);border-radius:17px;padding:1rem 1.1rem;height:100%;box-shadow:0 7px 20px rgba(16,43,78,.045);transition:transform .18s ease,box-shadow .18s ease}
 .ch-card h3{font-size:1.03rem;margin:.1rem 0 .45rem;color:var(--ch-navy)}
 .ch-card p{margin:0;color:var(--ch-muted);font-size:.91rem;line-height:1.5}
 .ch-muted{color:var(--ch-muted);font-size:.88rem}
 .ch-status{display:inline-block;padding:.28rem .68rem;border-radius:999px;background:#e8f6f2;color:#176653;border:1px solid #ccebe1;font-size:.78rem;font-weight:750}
-.ch-kpi{display:flex;align-items:center;gap:.8rem;min-height:98px;padding:.9rem 1rem;background:#fff;border:1px solid var(--ch-border);border-radius:15px;box-shadow:0 3px 14px rgba(16,43,78,.045)}
-.ch-kpi-icon{width:48px;height:48px;flex:0 0 48px;border-radius:50%;display:grid;place-items:center;font-size:1.35rem;font-weight:800}
-.ch-kpi-icon.navy{background:#e7eef7;color:var(--ch-navy)}.ch-kpi-icon.blue{background:#e3f5fa;color:#067fa1}.ch-kpi-icon.teal{background:#e3f5f2;color:#137b75}.ch-kpi-icon.cyan{background:#e0f7fa;color:#0b8094}.ch-kpi-icon.rose{background:#fff0f1;color:var(--ch-rose)}
-.ch-kpi-label{font-size:.78rem;font-weight:650;color:#586b7f;margin-bottom:.18rem}.ch-kpi-value{font-size:clamp(1.35rem,1.9vw,1.75rem);line-height:1.12;color:var(--ch-navy);font-weight:800;font-variant-numeric:tabular-nums}.ch-kpi-note{font-size:.76rem;color:#62758a;margin-top:.2rem}
+.ch-kpi{position:relative;overflow:hidden;display:flex;align-items:center;gap:.85rem;min-height:104px;padding:1rem 1.05rem;background:linear-gradient(140deg,#fff 0%,#f8faff 100%);border:1px solid rgba(203,218,244,.95);border-radius:17px;box-shadow:0 8px 22px rgba(23,50,100,.06);transition:transform .18s ease,box-shadow .18s ease}
+.ch-kpi::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,#31b6dc,#496de2,#8a55d7)}
+.ch-kpi-icon{width:50px;height:50px;flex:0 0 50px;border-radius:15px;display:grid;place-items:center;font-size:1.35rem;font-weight:800;color:#fff;box-shadow:0 7px 16px rgba(30,68,150,.2)}
+.ch-kpi-icon.navy{background:linear-gradient(145deg,#345fc9,#263b91);color:#fff}.ch-kpi-icon.blue{background:linear-gradient(145deg,#24bed0,#147ea9);color:#fff}.ch-kpi-icon.teal{background:linear-gradient(145deg,#26b984,#14785f);color:#fff}.ch-kpi-icon.cyan{background:linear-gradient(145deg,#7959db,#4b43ad);color:#fff}.ch-kpi-icon.rose{background:linear-gradient(145deg,#df6278,#ae304d);color:#fff}
+.ch-kpi-label{font-size:.78rem;font-weight:680;color:#586b7f;margin-bottom:.18rem}.ch-kpi-value{font-size:clamp(1.35rem,1.9vw,1.8rem);line-height:1.12;color:var(--ch-navy);font-weight:820;font-variant-numeric:tabular-nums;letter-spacing:-.02em}.ch-kpi-note{font-size:.76rem;color:#62758a;margin-top:.23rem}
 .ch-section-title{font-size:1.04rem;font-weight:760;color:var(--ch-navy);margin:0 0 .65rem}
 .ch-coverage-wrap{display:flex;align-items:center;justify-content:center;padding:.7rem 0 1rem}
 .ch-donut{width:180px;height:180px;border-radius:50%;display:grid;place-items:center;position:relative}
@@ -1017,20 +1028,77 @@ html,body,[data-testid="stAppViewContainer"]{background:var(--ch-canvas);color:v
 .ch-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:.65rem 1rem;font-size:.78rem;color:#42566b}.ch-legend-item{display:flex;align-items:center;gap:.38rem}.ch-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .ch-summary-band{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;padding:.9rem 1rem;background:linear-gradient(100deg,#e8f5fa,#f3f9fc);border:1px solid #d5eaf2;border-radius:14px;margin:.35rem 0 1.2rem;text-align:center}
 .ch-summary-band strong{display:block;color:var(--ch-navy);font-size:1.13rem;font-variant-numeric:tabular-nums}.ch-summary-band span{font-size:.78rem;color:#526a7f}
-.ch-priority{height:100%;padding:.85rem .9rem;border-radius:13px;background:#fff;border:1px solid var(--ch-border);border-top:3px solid var(--ch-cyan)}.ch-priority.warn{border-top-color:#e2a334}.ch-priority.danger{border-top-color:#d4525f}.ch-priority.good{border-top-color:#1b9d80}
-.ch-priority-head{font-size:.8rem;font-weight:750;color:#334b61;margin-bottom:.3rem}.ch-priority-value{font-size:1rem;font-weight:800;color:var(--ch-navy)}.ch-priority-note{font-size:.75rem;color:#65788a;margin-top:.18rem;line-height:1.4}
-[data-testid="stVerticalBlockBorderWrapper"]{background:#fff;border-color:var(--ch-border)!important;border-radius:15px;box-shadow:0 3px 14px rgba(16,43,78,.035)}
-[data-testid="stDataFrame"]{border:1px solid var(--ch-border);border-radius:12px;overflow:hidden}
-.stButton button,.stDownloadButton button{border-radius:10px;font-weight:650;transition:transform .15s ease,box-shadow .15s ease}
+.ch-priority{height:100%;padding:.9rem 1rem;border-radius:15px;background:linear-gradient(145deg,#fff,#f8faff);border:1px solid var(--ch-border);border-top:3px solid var(--ch-cyan);box-shadow:0 6px 16px rgba(23,50,100,.04)}.ch-priority.warn{border-top-color:#e2a334}.ch-priority.danger{border-top-color:#d4525f}.ch-priority.good{border-top-color:#1b9d80}
+.ch-priority-head{font-size:.8rem;font-weight:750;color:#334b61;margin-bottom:.3rem}.ch-priority-value{font-size:1.03rem;font-weight:820;color:var(--ch-navy)}.ch-priority-note{font-size:.75rem;color:#65788a;margin-top:.18rem;line-height:1.4}
+.ch-chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:.15rem 0 .35rem}.ch-chart-note{font-size:.76rem;color:#63758d;margin:.3rem 0 0}
+[data-testid="stVerticalBlockBorderWrapper"]{background:linear-gradient(145deg,#fff,#fbfcff);border-color:var(--ch-border)!important;border-radius:18px;box-shadow:0 8px 24px rgba(16,43,78,.055)}
+[data-testid="stDataFrame"]{border:1px solid var(--ch-border);border-radius:13px;overflow:hidden}
+[data-testid="stSelectbox"] div[data-baseweb="select"]>div{border-radius:10px;border-color:#d6e0f0;background:rgba(255,255,255,.92)}
+[data-testid="stTabs"] button[role="tab"]{border-radius:10px;font-weight:650}
+.stButton button,.stDownloadButton button{border-radius:11px;font-weight:680;transition:transform .15s ease,box-shadow .15s ease}
 .stButton button[kind="primary"],.stDownloadButton button[kind="primary"]{background:#123c67;border-color:#123c67;color:#fff}
 .stButton button:hover,.stDownloadButton button:hover{border-color:#1592a5;color:#0c6074;box-shadow:0 4px 12px rgba(16,43,78,.12);transform:translateY(-1px)}
 :focus-visible{outline:3px solid #087f9a!important;outline-offset:3px!important;box-shadow:0 0 0 2px #fff!important}
 @media(max-width:760px){.block-container{padding:1rem .8rem 2rem}.ch-hero{padding:1rem 1.05rem;border-radius:13px}.ch-card{height:auto}.ch-summary-band{grid-template-columns:1fr}.ch-kpi{min-height:88px}.ch-donut{width:155px;height:155px}}
 @media(max-width:640px){.block-container{padding:.85rem .65rem 1.75rem}.ch-hero h1{font-size:1.55rem}.ch-kpi{gap:.6rem;padding:.75rem}.ch-kpi-icon{width:42px;height:42px;flex-basis:42px}.ch-summary-band{margin:.25rem 0 1rem}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+iframe[title="Persistencia de posición de desplazamiento"]{position:fixed!important;left:-2px!important;bottom:0!important;width:1px!important;height:1px!important;border:0!important;opacity:0!important;pointer-events:none!important}
 hr{border-color:var(--ch-border)}
 </style>
 """, unsafe_allow_html=True)
+
+# Streamlit reruns after widget input. Keep only scroll offsets in browser
+# sessionStorage so changing controls does not send or persist salary data.
+st.iframe(
+    """<script>
+    (() => {
+      try {
+        const host = window.parent;
+        const doc = host.document;
+        const key = "capital-humano-scroll-v1";
+        const main = doc.querySelector('[data-testid="stMain"]')
+          || doc.querySelector('[data-testid="stAppViewContainer"]')
+          || doc.scrollingElement;
+        const sidebar = doc.querySelector('[data-testid="stSidebarContent"]')
+          || doc.querySelector('[data-testid="stSidebar"]');
+        const storage = host.sessionStorage;
+        const save = () => {
+          storage.setItem(key, JSON.stringify({
+            main: Math.max(host.scrollY || 0, main?.scrollTop || 0),
+            sidebar: sidebar?.scrollTop || 0
+          }));
+        };
+        const restore = () => {
+          const saved = JSON.parse(storage.getItem(key) || "{}");
+          if (Number.isFinite(saved.main)) {
+            if (main) main.scrollTop = saved.main;
+            host.scrollTo(0, saved.main);
+          }
+          if (sidebar && Number.isFinite(saved.sidebar)) sidebar.scrollTop = saved.sidebar;
+        };
+        const bound = host.__capitalHumanoScrollNodes || (host.__capitalHumanoScrollNodes = new WeakSet());
+        [main, sidebar].filter(Boolean).forEach(node => {
+          if (!bound.has(node)) {
+            node.addEventListener("scroll", save, { passive: true });
+            bound.add(node);
+          }
+        });
+        if (!host.__capitalHumanoScrollWindowBound) {
+          host.addEventListener("scroll", save, { passive: true });
+          host.__capitalHumanoScrollWindowBound = true;
+        }
+        requestAnimationFrame(restore);
+        setTimeout(restore, 120);
+      } catch (_) {
+        // Some hosted browsers isolate components; native scrolling remains available.
+      }
+    })();
+    </script>""",
+    width="stretch",
+    height=1,
+    tab_index=-1,
+    alt="Persistencia de posición de desplazamiento",
+)
 
 try:
     plantilla_sha256 = st.session_state.get("plantilla_importada", {}).get("sha256")
@@ -1056,7 +1124,7 @@ elif not manifiesto.get("integrity_ok"):
 
 with st.sidebar:
     st.markdown(
-        f"<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#667b89;font-size:.83rem'>{T('Panel de Escala Salarial')}</div></div>",
+        f"<div style='padding:.25rem 0 1rem'><div style='font-size:1.65rem'>▦ <b>Capital Humano</b></div><div style='color:#b8c7e8;font-size:.83rem'>{T('Panel de Escala Salarial')}</div></div>",
         unsafe_allow_html=True,
     )
     idioma_visible = st.selectbox("Idioma / Language", ["Español", "English"], key="idioma_interfaz")
@@ -1102,6 +1170,11 @@ def encabezado(titulo, bajada):
     )
 
 
+def seleccionar_vista(nombre: str) -> None:
+    """Callback para que las acciones del panel abran una sección real."""
+    st.session_state["panel_seccion"] = T(nombre)
+
+
 def mostrar_kpi(label, value, note, icon, tone):
     """Renderiza un KPI accesible; escapa todo el contenido interpolado en HTML."""
     accessible_label = html.escape(" · ".join(part for part in (label, value, note) if part))
@@ -1134,6 +1207,86 @@ def mostrar_dataframe(tabla, **kwargs):
     if column_config and UI_LANGUAGE == "en":
         kwargs["column_config"] = {T(label): config for label, config in column_config.items()}
     st.dataframe(tabla_visual, **kwargs)
+
+
+TIPOS_GRAFICO = ["Barras horizontales", "Columnas", "Líneas", "Área"]
+COLORES_GRAFICO = ["#4169d8", "#19aebd", "#8055d7", "#e4a02f"]
+
+
+def mostrar_grafico(
+    tabla: pd.DataFrame,
+    tipo: str,
+    *,
+    currency: bool = True,
+    height: int = 350,
+) -> None:
+    """Grafica series con valores y tooltips localizados, sin cambiar el dato."""
+    if tabla.empty:
+        st.info(T("No hay datos para mostrar con estos filtros."))
+        return
+    data = tabla.rename_axis("Grupo").reset_index().melt(
+        id_vars="Grupo", var_name="Serie", value_name="Valor"
+    )
+    if currency:
+        data["Etiqueta"] = data["Valor"].map(lambda value: ui.format_currency(value, UI_LANGUAGE))
+        axis_expr = "datum.value < 0 ? '$ -' + format(-datum.value, ',.2f') : '$ ' + format(datum.value, ',.2f')"
+        axis_title = T("Importe (CUP)")
+        tooltip_title = T("Importe")
+    else:
+        data["Etiqueta"] = data["Valor"].map(lambda value: f"{value:,.2f}%")
+        axis_expr = "format(datum.value, ',.1f') + '%'"
+        axis_title = T("Variación porcentual")
+        tooltip_title = T("Variación porcentual")
+
+    palette = COLORES_GRAFICO[:max(1, data["Serie"].nunique())]
+    color = alt.Color(
+        "Serie:N",
+        scale=alt.Scale(range=palette),
+        legend=None if data["Serie"].nunique() == 1 else alt.Legend(title=None, orient="top"),
+    )
+    tooltip = [
+        alt.Tooltip("Grupo:N", title=T("Grupo")),
+        alt.Tooltip("Serie:N", title=T("Serie")),
+        alt.Tooltip("Etiqueta:N", title=tooltip_title),
+    ]
+    if tipo == "Barras horizontales":
+        chart = alt.Chart(data).mark_bar(cornerRadiusEnd=5, opacity=.94).encode(
+            x=alt.X("Valor:Q", title=axis_title, axis=alt.Axis(labelExpr=axis_expr)),
+            y=alt.Y("Grupo:N", title=None, sort=tabla.index.tolist()),
+            color=color,
+            tooltip=tooltip,
+        )
+    elif tipo == "Columnas":
+        chart = alt.Chart(data).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4, opacity=.94).encode(
+            x=alt.X("Grupo:N", title=None, sort=tabla.index.tolist(), axis=alt.Axis(labelAngle=-35)),
+            y=alt.Y("Valor:Q", title=axis_title, axis=alt.Axis(labelExpr=axis_expr)),
+            color=color,
+            tooltip=tooltip,
+        )
+    elif tipo == "Líneas":
+        chart = alt.Chart(data).mark_line(
+            point=alt.OverlayMarkDef(filled=True, size=55), strokeWidth=3
+        ).encode(
+            x=alt.X("Grupo:N", title=None, sort=tabla.index.tolist()),
+            y=alt.Y("Valor:Q", title=axis_title, axis=alt.Axis(labelExpr=axis_expr)),
+            color=color,
+            tooltip=tooltip,
+        )
+    else:
+        chart = alt.Chart(data).mark_area(opacity=.24, line=True).encode(
+            x=alt.X("Grupo:N", title=None, sort=tabla.index.tolist()),
+            y=alt.Y("Valor:Q", title=axis_title, axis=alt.Axis(labelExpr=axis_expr)),
+            color=color,
+            tooltip=tooltip,
+        )
+    chart = (
+        chart.properties(height=height)
+        .configure_view(stroke=None)
+        .configure_axis(labelColor="#5b6e86", titleColor="#435873", gridColor="#e8edf6")
+        .configure_legend(labelColor="#435873")
+        .interactive()
+    )
+    st.altair_chart(chart, width="stretch")
 
 
 def mostrar_tabla_escala(tabla):
@@ -1238,26 +1391,61 @@ def mostrar_importador_plantilla():
 if vista == "Panel de control":
     encabezado("Panel de Control", "Resumen ejecutivo, validaciones y accesos directos para preparar la propuesta.")
     c1, c2, c3, c4 = st.columns(4, gap="medium")
-    mostrar_kpi(T("Mínimo legal de referencia"), ui.format_currency(3210, UI_LANGUAGE), T("Grupo I · CUP"), "●", "navy")
-    mostrar_kpi(T("Multiplicador seleccionado"), f"{factor:.2f}×", T("Límite absoluto 6× por cargo"), "▥", "blue")
-    mostrar_kpi(T("Cargos encontrados"), f"{len(detalle_df):,}", T("Registros de la plantilla fuente"), "▤", "teal")
-    mostrar_kpi(T("Grupos con propuesta"), f"{len(propuesta)}/{len(escala_df)}", T("Los demás conservan la escala oficial"), "✓", "cyan")
+    with c1:
+        mostrar_kpi(T("Mínimo legal de referencia"), ui.format_currency(3210, UI_LANGUAGE), T("Grupo I · CUP"), "●", "navy")
+    with c2:
+        mostrar_kpi(T("Multiplicador seleccionado"), f"{factor:.2f}×", T("Límite absoluto 6× por cargo"), "▥", "blue")
+    with c3:
+        mostrar_kpi(T("Cargos encontrados"), f"{len(detalle_df):,}", T("Registros de la plantilla fuente"), "▤", "teal")
+    with c4:
+        mostrar_kpi(T("Grupos con propuesta"), f"{len(propuesta)}/{len(escala_df)}", T("Los demás conservan la escala oficial"), "✓", "cyan")
 
     left, right = st.columns([1.7, 1], gap="large")
     with left:
         with st.container(border=True):
             st.markdown(f"<div class='ch-section-title'>{T('Vista comparativa de la escala')}</div>", unsafe_allow_html=True)
-            grafico = propuesta_rows[[
-                "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
-            ]].set_index("Grupo").rename(columns={
-                "Escala oficial Res. 15/2026 (CUP)": T("Oficial Res. 15/2026"),
-                "Nueva propuesta (CUP)": f"{T('Propuesta')} {factor:.2f}×",
-            })
-            st.bar_chart(
-                grafico, width="stretch", height=350, horizontal=True,
-                color=["#173b65", "#35b9d0"],
+            controls = st.columns([1.25, 1], gap="small")
+            desglose = controls[0].selectbox(
+                T("Desglose del gráfico"),
+                ["Comparación oficial / propuesta", "Variación absoluta (CUP)", "Variación porcentual"],
+                format_func=T,
+                key="dashboard_chart_breakdown",
             )
-            st.caption(T("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII)."))
+            tipo_grafico = controls[1].selectbox(
+                T("Tipo de gráfico"), TIPOS_GRAFICO, format_func=T,
+                key="dashboard_chart_type",
+            )
+            if desglose == "Comparación oficial / propuesta":
+                grafico = propuesta_rows[[
+                    "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
+                ]].set_index("Grupo").rename(columns={
+                    "Escala oficial Res. 15/2026 (CUP)": T("Oficial Res. 15/2026"),
+                    "Nueva propuesta (CUP)": f"{T('Propuesta')} {factor:.2f}×",
+                })
+            elif desglose == "Variación porcentual":
+                grafico = propuesta_rows.assign(
+                    **{"Cambio porcentual": (
+                        (propuesta_rows["Nueva propuesta (CUP)"] /
+                         propuesta_rows["Escala oficial Res. 15/2026 (CUP)"] - 1) * 100
+                    )}
+                ).set_index("Grupo")[["Cambio porcentual"]].rename(
+                    columns={"Cambio porcentual": T("Variación porcentual")}
+                )
+            else:
+                grafico = propuesta_rows.assign(
+                    **{"Cambio (CUP)": (
+                        propuesta_rows["Nueva propuesta (CUP)"] -
+                        propuesta_rows["Escala oficial Res. 15/2026 (CUP)"]
+                    )}
+                ).set_index("Grupo")[["Cambio (CUP)"]].rename(
+                    columns={"Cambio (CUP)": T("Variación absoluta (CUP)")}
+                )
+            mostrar_grafico(
+                grafico, tipo_grafico,
+                currency=desglose != "Variación porcentual",
+                height=345,
+            )
+            st.caption(T("Los datos mostrados corresponden a grupos con propuesta; no representan el costo total de nómina."))
     with right:
         with st.container(border=True):
             st.markdown(f"<div class='ch-section-title'>{T('Cobertura de la escala')}</div>", unsafe_allow_html=True)
@@ -1316,10 +1504,13 @@ if vista == "Panel de control":
     a1, a2, a3 = st.columns(3, gap="medium")
     with a1:
         st.markdown(f"<div class='ch-card'><h3>{T('📊 Revisar escala')}</h3><p>{T('Consulta los 32 grupos, salarios oficiales y propuesta ajustada.')}</p></div>", unsafe_allow_html=True)
+        st.button(T("Abrir escala"), key="quick_open_scale", on_click=seleccionar_vista, args=("Escala salarial",), width="stretch")
     with a2:
         st.markdown(f"<div class='ch-card'><h3>{T('👥 Auditar plantilla')}</h3><p>{T('Id. correlativo, búsqueda y filtros conservan la referencia a hoja y fila de origen.')}</p></div>", unsafe_allow_html=True)
+        st.button(T("Abrir plantilla"), key="quick_open_template", on_click=seleccionar_vista, args=("Plantilla por cargo",), width="stretch")
     with a3:
         st.markdown(f"<div class='ch-card'><h3>{T('📄 Preparar entregables')}</h3><p>{T('Exporta el escenario activo a un libro Excel o PDF imprimible.')}</p></div>", unsafe_allow_html=True)
+        st.button(T("Abrir exportaciones"), key="quick_open_exports", on_click=seleccionar_vista, args=("Exportaciones",), width="stretch")
     if anomalias:
         with st.expander(T("Observaciones detectadas en la fuente"), expanded=False):
             for nota in anomalias:
@@ -1362,10 +1553,40 @@ elif vista == "Comparar escenarios":
         k1.metric(T("Grupos con cambio"), f"{grupos_modificados} {T('de')} {len(comparacion_df)}")
         k2.metric(T("Mayor cambio por grupo"), ui.format_currency(maxima_variacion, UI_LANGUAGE))
         k3.metric(T("Factores comparados"), f"{factor_a:.2f}× {T('vs.')} {factor_b:.2f}×")
-        grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]].rename(
-            columns={"Variación B − A (CUP)": T("Variación B − A (CUP)")}
+        chart_controls = st.columns([1.25, 1], gap="small")
+        desglose_comparacion = chart_controls[0].selectbox(
+            T("Desglose del gráfico"),
+            ["Variación absoluta (CUP)", "Variación porcentual", "Comparación escenarios A/B"],
+            format_func=T,
+            key="comparison_chart_breakdown",
         )
-        st.bar_chart(grafico_comparacion, width="stretch", height=350)
+        tipo_grafico_comparacion = chart_controls[1].selectbox(
+            T("Tipo de gráfico"), TIPOS_GRAFICO, format_func=T,
+            key="comparison_chart_type",
+        )
+        if desglose_comparacion == "Comparación escenarios A/B":
+            grafico_comparacion = comparacion_df.set_index("Grupo")[[
+                "Escenario A (CUP)", "Escenario B (CUP)"
+            ]].rename(columns={
+                "Escenario A (CUP)": T("Escenario A"),
+                "Escenario B (CUP)": T("Escenario B"),
+            })
+        elif desglose_comparacion == "Variación porcentual":
+            grafico_comparacion = comparacion_df.assign(
+                **{"Variación porcentual": comparacion_df["Variación relativa"] * 100}
+            ).set_index("Grupo")[["Variación porcentual"]].rename(
+                columns={"Variación porcentual": T("Variación porcentual")}
+            )
+        else:
+            grafico_comparacion = comparacion_df.set_index("Grupo")[["Variación B − A (CUP)"]].rename(
+                columns={"Variación B − A (CUP)": T("Variación absoluta (CUP)")}
+            )
+        mostrar_grafico(
+            grafico_comparacion,
+            tipo_grafico_comparacion,
+            currency=desglose_comparacion != "Variación porcentual",
+            height=350,
+        )
         mostrar_dataframe(
             comparacion_df, width="stretch", hide_index=True,
             column_config={

@@ -12,7 +12,7 @@ CH-06 se trabaja con objetivo WCAG 2.2 AA, no como certificación ni como afirma
 
 ## Cambios en curso
 
-La interfaz incluye un indicador de foco visible de alto contraste, un color de texto secundario que alcanza contraste AA sobre blanco, ajustes de maquetación para anchos móviles y respeto por la preferencia de movimiento reducido. `tests/test_accessibility_contract.py` comprueba los pares de color seleccionados y la presencia de estos estilos.
+La interfaz incluye un indicador de foco visible de alto contraste, un color de texto secundario que alcanza contraste AA sobre blanco, ajustes de maquetación para anchos móviles y respeto por la preferencia de movimiento reducido. `test_accessibility_contract.py` comprueba algunos pares de color seleccionados y la presencia de estos estilos; no sustituye las verificaciones manuales descritas abajo.
 
 ## Verificaciones que faltan
 
