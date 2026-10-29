@@ -936,7 +936,7 @@ NAV = [
 
 st.markdown("""
 <style>
-:root{--ch-navy:#15324b;--ch-teal:#16866b;--ch-gold:#e6b85c;--ch-ink:#233746;--ch-muted:#667b89}
+:root{color-scheme:light;--ch-navy:#15324b;--ch-teal:#16866b;--ch-gold:#e6b85c;--ch-ink:#233746;--ch-muted:#536675}
 .block-container{padding-top:1.3rem;padding-bottom:3rem;max-width:1520px}
 [data-testid="stSidebar"]{border-right:1px solid #e5edf0}
 [data-testid="stSidebar"] [data-testid="stMetric"]{background:#f3f8f7;border:1px solid #e1eeeb;padding:.55rem .7rem;border-radius:12px}
@@ -948,6 +948,9 @@ st.markdown("""
 .ch-card p{margin:0;color:var(--ch-muted);font-size:.91rem}
 .ch-muted{color:var(--ch-muted);font-size:.88rem}
 .ch-status{display:inline-block;padding:.22rem .58rem;border-radius:20px;background:#e8f5ee;color:#236645;font-size:.78rem;font-weight:700}
+:focus-visible{outline:3px solid var(--ch-gold)!important;outline-offset:3px!important;box-shadow:0 0 0 5px var(--ch-navy)!important}
+@media(max-width:640px){.block-container{padding:1rem .75rem 2rem}.ch-hero{padding:1.1rem 1rem;border-radius:14px}.ch-hero h1{font-size:clamp(1.5rem,7vw,2.05rem)}.ch-kicker{letter-spacing:.06em}.ch-card{height:auto}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 hr{border-color:#e8eef1}
 </style>
 """, unsafe_allow_html=True)
