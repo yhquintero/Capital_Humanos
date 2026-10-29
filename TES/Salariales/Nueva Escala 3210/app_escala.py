@@ -61,14 +61,50 @@ st.set_page_config(page_title="Capital Humano | Panel de Control", page_icon="�
 
 
 @st.cache_data(show_spinner="Leyendo la plantilla y verificando los grupos…")
-def cargar_datos():
+def _cargar_datos_oficiales():
     propuesta, contadores, registros, anomalias, hallazgos_calidad = base.extraer_propuesta_plantilla_con_calidad()
     anterior = base.cargar_salarios_res29()
     return propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad
 
 
+def cargar_datos(plantilla_importada_sha256=None):
+    plantilla_temporal = st.session_state.get("plantilla_importada")
+    if plantilla_importada_sha256:
+        if not plantilla_temporal or plantilla_temporal.get("sha256") != plantilla_importada_sha256:
+            raise ValueError("La carga temporal cambió durante la validación de la sesión.")
+        # Las cargas salariales temporales nunca pasan por el caché global de Streamlit.
+        return (
+            plantilla_temporal["proposal"],
+            plantilla_temporal["counters"],
+            plantilla_temporal["records"],
+            plantilla_temporal["anomalies"],
+            base.cargar_salarios_res29(),
+            plantilla_temporal["findings"],
+        )
+    return _cargar_datos_oficiales()
+
+
 def cargar_manifiesto():
-    return base.manifiesto_para_salida()
+    manifiesto = base.manifiesto_para_salida()
+    plantilla_temporal = st.session_state.get("plantilla_importada")
+    if not plantilla_temporal:
+        return manifiesto
+    manifiesto = {**manifiesto, "integrity_ok": False, "sources": list(manifiesto.get("sources", []))}
+    manifiesto["sources"].append({
+        "id": "plantilla_subida_sesion",
+        "label": "Plantilla importada (solo sesión; pendiente de aprobación)",
+        "path": f"Carga de sesión: {plantilla_temporal['filename']}",
+        "status": "NO APROBADA · SOLO SESIÓN",
+        "expected_sha256": "",
+        "actual_sha256": plantilla_temporal["sha256"],
+        "size_bytes": plantilla_temporal["size_bytes"],
+    })
+    return manifiesto
+
+
+def descargas_deshabilitadas():
+    """Bloquea exportaciones salariales cuando se usa una plantilla no aprobada."""
+    return bool(st.session_state.get("plantilla_importada"))
 
 
 def crear_tablas(factor, propuesta, registros, anterior):
@@ -956,7 +992,8 @@ hr{border-color:#e8eef1}
 """, unsafe_allow_html=True)
 
 try:
-    propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad = cargar_datos()
+    plantilla_sha256 = st.session_state.get("plantilla_importada", {}).get("sha256")
+    propuesta, contadores, registros, anomalias, anterior, hallazgos_calidad = cargar_datos(plantilla_sha256)
 except Exception as exc:
     st.error(f"No se pudo cargar la plantilla de origen: {exc}")
     st.info("Comprueba que el archivo .xls de la plantilla y la escala histórica estén dentro del repositorio. Si las rutas son correctas, abre la guía de diagnóstico del README.")
@@ -965,7 +1002,13 @@ except Exception as exc:
 manifiesto = cargar_manifiesto()
 version_visible = _texto_visible(manifiesto.get("application_version"), base.VERSION_APP)
 fecha_verificacion_visible = _texto_visible(manifiesto.get("checked_at_utc"), "No disponible")
-if not manifiesto.get("integrity_ok"):
+if st.session_state.get("plantilla_importada"):
+    st.warning(
+        "Plantilla temporal activa solo en esta sesión. Es una fuente no aprobada: todas las descargas salariales están bloqueadas. "
+        "Restaura la plantilla oficial para volver a exportar.",
+        icon="⚠️",
+    )
+elif not manifiesto.get("integrity_ok"):
     st.warning(
         "La copia actual de una o más fuentes o archivos de cálculo no coincide con el manifiesto aprobado. "
         "Revisa la sección Sistema y HTTPS y no distribuyas los informes hasta validar el cambio.",
@@ -990,8 +1033,9 @@ with st.sidebar:
 
 escala_df, detalle_df = crear_tablas(factor, propuesta, registros, anterior)
 revision_calidad_base = crear_tabla_revision_calidad(hallazgos_calidad)
+identidad_plantilla = st.session_state.get("plantilla_importada", {}).get("sha256", "plantilla-oficial")
 firma_incidencias = hashlib.sha256(
-    "|".join(revision_calidad_base["ID incidencia"].tolist()).encode("utf-8")
+    (identidad_plantilla + "|" + "|".join(revision_calidad_base["ID incidencia"].tolist())).encode("utf-8")
 ).hexdigest()
 if st.session_state.get("firma_incidencias_calidad") != firma_incidencias:
     st.session_state["firma_incidencias_calidad"] = firma_incidencias
@@ -1034,6 +1078,66 @@ def mostrar_tabla_detalle(tabla):
             "Factor aplicado": st.column_config.NumberColumn(format="%.2f×"),
         },
     )
+
+
+def mostrar_importador_plantilla():
+    plantilla_temporal = st.session_state.get("plantilla_importada")
+    if plantilla_temporal:
+        st.warning(
+            f"Activa en esta sesión: {plantilla_temporal['filename']} · "
+            f"{len(plantilla_temporal['records'])} filas válidas · "
+            f"SHA-256 {plantilla_temporal['sha256'][:16]}… Las descargas salariales están bloqueadas.",
+            icon="⚠️",
+        )
+        if st.button("Volver a la plantilla oficial", key="restaurar_plantilla_oficial"):
+            st.session_state.pop("plantilla_importada", None)
+            st.rerun()
+
+    with st.expander("Importar otra plantilla para revisar", expanded=False):
+        st.caption(
+            "Admite .xls y .xlsx sin macros (máximo 15 MiB). El archivo se analiza en memoria. "
+            "La vista previa no lo activa ni modifica el archivo fuente."
+        )
+        uploaded = st.file_uploader(
+            "Seleccionar plantilla (.xls o .xlsx)",
+            type=["xls", "xlsx"],
+            key="subida_plantilla_calidad",
+            help="No se guardan archivos subidos en el repositorio ni en el disco del servidor.",
+        )
+        if uploaded is None:
+            return
+        resultado_importacion = base.validar_plantilla_subida(uploaded.name, uploaded.getvalue())
+        st.caption(
+            f"Archivo: {resultado_importacion['filename']} · "
+            f"{uploaded.size:,} bytes · SHA-256: {resultado_importacion['sha256']}"
+        )
+        if resultado_importacion["validation"]:
+            st.dataframe(pd.DataFrame(resultado_importacion["validation"]), width="stretch", hide_index=True)
+        if resultado_importacion["errors"]:
+            for error in resultado_importacion["errors"]:
+                st.error(error)
+        if resultado_importacion["warnings"]:
+            for warning in resultado_importacion["warnings"]:
+                st.warning(warning)
+        if resultado_importacion["preview"]:
+            st.subheader("Vista previa · primeras 25 filas válidas")
+            st.dataframe(pd.DataFrame(resultado_importacion["preview"]), width="stretch", hide_index=True)
+        if resultado_importacion["findings"]:
+            st.caption(f"Hallazgos detectados: {len(resultado_importacion['findings'])}. Se conservan todas las filas del archivo.")
+        if resultado_importacion["ready"]:
+            st.warning(
+                "Confirmar solo cambia los datos de esta sesión. No reemplaza la fuente oficial; "
+                "las descargas permanecen bloqueadas hasta aprobar formalmente la nueva fuente."
+            )
+            if st.button("Usar temporalmente en esta sesión", key="activar_plantilla_temporal"):
+                st.session_state["plantilla_importada"] = {
+                    key: resultado_importacion[key]
+                    for key in (
+                        "filename", "sha256", "size_bytes", "proposal", "counters",
+                        "records", "anomalies", "findings",
+                    )
+                }
+                st.rerun()
 
 
 if vista == "Panel de control":
@@ -1121,7 +1225,7 @@ elif vista == "Comparar escenarios":
         out_csv, out_xlsx = st.columns(2)
         csv_comparacion = crear_zip_csv_con_manifiesto(comparacion_df, "Comparacion_escenarios_grupo.csv", manifiesto)
         with out_csv:
-            st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_grupo.zip", "application/zip", width="stretch")
+            st.download_button("Descargar CSV + manifiesto (.zip)", csv_comparacion, "Comparacion_escenarios_grupo.zip", "application/zip", width="stretch", disabled=descargas_deshabilitadas())
         with out_xlsx:
             xlsx_comparacion = crear_excel_comparacion(comparacion_df, factor_a, factor_b, manifiesto)
             st.download_button(
@@ -1129,6 +1233,7 @@ elif vista == "Comparar escenarios":
                 f"Comparacion_escenarios_grupo_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch",
+                disabled=descargas_deshabilitadas(),
             )
 
     with cargo_tab:
@@ -1162,6 +1267,7 @@ elif vista == "Comparar escenarios":
             st.download_button(
                 "Descargar CSV por cargo + manifiesto (.zip)", paquete_detalle_csv,
                 "Comparacion_escenarios_por_cargo.zip", "application/zip", width="stretch",
+                disabled=descargas_deshabilitadas(),
             )
         with detalle_xlsx:
             detalle_xlsx_bytes = crear_excel_comparacion_cargos(
@@ -1172,10 +1278,12 @@ elif vista == "Comparar escenarios":
                 f"Comparacion_escenarios_cargos_{factor_a:.2f}x_{factor_b:.2f}x.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 width="stretch",
+                disabled=descargas_deshabilitadas(),
             )
 
 elif vista == "Plantilla por cargo":
     encabezado("Plantilla por cargo", "Detalle rastreable al archivo de origen con filtros y búsqueda rápida.")
+    mostrar_importador_plantilla()
     st.subheader("Calidad de la fuente")
     hallazgos_df = pd.DataFrame(hallazgos_calidad)
     conteo_hallazgos = (
@@ -1225,6 +1333,7 @@ elif vista == "Plantilla por cargo":
             "Descargar incidencias + manifiesto (.zip)", paquete_calidad,
             "Incidencias_calidad_plantilla.zip", "application/zip",
             key="descargar_incidencias_calidad",
+            disabled=descargas_deshabilitadas(),
         )
     st.caption("Cada hallazgo incluye hoja y fila. Un posible duplicado coincide en hoja, grupo, cargo y salario: puede ser una plaza legítima repetida, por lo que se conserva hasta revisión humana.")
     st.divider()
@@ -1247,7 +1356,11 @@ elif vista == "Plantilla por cargo":
     m3.metric("Propuesta calculada", f"${filtrada['Salario ajustado (CUP)'].sum():,.2f}")
     mostrar_tabla_detalle(filtrada)
     csv = crear_zip_csv_con_manifiesto(filtrada, "Plantilla_Resolucion87_filtrada.csv", manifiesto)
-    st.download_button("Descargar filtro CSV + manifiesto (.zip)", csv, "Plantilla_Resolucion87_filtrada.zip", "application/zip")
+    st.download_button(
+        "Descargar filtro CSV + manifiesto (.zip)", csv,
+        "Plantilla_Resolucion87_filtrada.zip", "application/zip",
+        disabled=descargas_deshabilitadas(),
+    )
 
 elif vista == "Exportaciones":
     encabezado("Exportar y presentar", "Valida el escenario antes de preparar documentos consistentes para revisión.")

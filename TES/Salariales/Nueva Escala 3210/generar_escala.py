@@ -29,8 +29,11 @@ import hashlib
 import json
 import math
 import os
+import re
 import unicodedata
+import zipfile
 from collections import Counter, defaultdict
+from io import BytesIO
 from pathlib import Path
 
 import xlrd
@@ -331,26 +334,107 @@ def _crear_hallazgo_calidad(tipo, hoja, fila, cargo, grupo, valor, detalle):
     }
 
 
-def extraer_propuesta_plantilla_con_calidad():
+MAX_PLANTILLA_UPLOAD_BYTES = 15 * 1024 * 1024
+MAX_PLANTILLA_XLSX_EXPANDED_BYTES = 64 * 1024 * 1024
+MAX_PLANTILLA_XLSX_ENTRIES = 200
+MAX_PLANTILLA_SHEETS = 80
+MAX_PLANTILLA_CELLS = 2_000_000
+
+
+class _HojaXlsxAdaptada:
+    """Expone celdas XLSX con la interfaz de lectura utilizada para XLS."""
+
+    def __init__(self, worksheet):
+        self._worksheet = worksheet
+        self.name = worksheet.title
+        self.nrows = worksheet.max_row or 0
+        self.ncols = worksheet.max_column or 0
+
+    def cell_value(self, row: int, column: int):
+        return self._worksheet.cell(row=row + 1, column=column + 1).value
+
+
+def _abrir_plantilla_subida(file_name: str, payload: bytes):
+    """Abre XLS/XLSX en memoria tras comprobar tamaño y estructura básica."""
+    extension = Path(file_name).suffix.casefold()
+    if extension not in {".xls", ".xlsx"}:
+        raise ValueError("Formato no admitido: usa un archivo .xls o .xlsx sin macros.")
+    if not payload or len(payload) > MAX_PLANTILLA_UPLOAD_BYTES:
+        raise ValueError("El archivo está vacío o supera el límite de 15 MiB.")
+
+    if extension == ".xls":
+        if not payload.startswith(bytes.fromhex("D0CF11E0A1B11AE1")):
+            raise ValueError("La extensión .xls no coincide con la firma del archivo.")
+        workbook = xlrd.open_workbook(file_contents=payload, on_demand=True)
+        if workbook.nsheets > MAX_PLANTILLA_SHEETS:
+            workbook.release_resources()
+            raise ValueError(f"El libro supera el máximo de {MAX_PLANTILLA_SHEETS} hojas.")
+        sheets = workbook.sheets()
+        total_cells = sum(sheet.nrows * sheet.ncols for sheet in sheets)
+        if total_cells > MAX_PLANTILLA_CELLS:
+            workbook.release_resources()
+            raise ValueError("El libro supera el límite seguro de celdas para revisión.")
+        return workbook, sheets, "xls"
+
+    try:
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            infos = archive.infolist()
+            if len(infos) > MAX_PLANTILLA_XLSX_ENTRIES:
+                raise ValueError("El XLSX contiene demasiados componentes internos.")
+            if "[Content_Types].xml" not in archive.namelist():
+                raise ValueError("El archivo ZIP no tiene la estructura de un libro XLSX.")
+            expanded_size = sum(info.file_size for info in infos)
+            if expanded_size > MAX_PLANTILLA_XLSX_EXPANDED_BYTES:
+                raise ValueError("El XLSX supera el límite seguro de tamaño descomprimido.")
+            if any(info.file_size > 1024 * 1024 and info.compress_size == 0 for info in infos):
+                raise ValueError("El XLSX contiene una entrada comprimida inválida.")
+            if any(
+                info.compress_size and info.file_size / info.compress_size > 200
+                for info in infos
+            ):
+                raise ValueError("El XLSX supera el límite de compresión permitido.")
+    except zipfile.BadZipFile as exc:
+        raise ValueError("El archivo .xlsx no es un ZIP válido.") from exc
+
+    workbook = load_workbook(BytesIO(payload), data_only=True, read_only=True)
+    worksheets = workbook.worksheets
+    if not worksheets or len(worksheets) > MAX_PLANTILLA_SHEETS:
+        workbook.close()
+        raise ValueError(f"El libro debe tener entre 1 y {MAX_PLANTILLA_SHEETS} hojas.")
+    total_cells = sum((sheet.max_row or 0) * (sheet.max_column or 0) for sheet in worksheets)
+    if total_cells > MAX_PLANTILLA_CELLS:
+        workbook.close()
+        raise ValueError("El libro supera el límite seguro de celdas para revisión.")
+    return workbook, [_HojaXlsxAdaptada(sheet) for sheet in worksheets], "xlsx"
+
+
+def extraer_propuesta_plantilla_con_calidad(file_bytes: bytes | None = None, file_name: str | None = None):
     """Extrae cargos y devuelve incidencias revisables sin modificar la fuente.
 
-    Devuelve el mismo núcleo de datos que ``extraer_propuesta_plantilla`` y una
-    lista de hallazgos con hoja/fila para salarios ausentes/no válidos, cargos
-    sin descripción, posibles duplicados exactos y valores no mayoritarios.
-    Los posibles duplicados se conservan y ninguna incidencia se corrige aquí.
+    Sin argumentos lee la plantilla oficial del repositorio. Con ``file_bytes``
+    y ``file_name`` inspecciona en memoria un XLS/XLSX subido, sin guardarlo.
+    Los posibles duplicados se conservan; ninguna incidencia se corrige aquí.
     """
-    libro = xlrd.open_workbook(RUTA_PLANTILLA)
+    if file_bytes is None:
+        libro = xlrd.open_workbook(RUTA_PLANTILLA)
+        hojas = libro.sheets()
+    else:
+        if not file_name:
+            raise ValueError("Se necesita el nombre de archivo para validar el formato.")
+        libro, hojas, formato = _abrir_plantilla_subida(file_name, file_bytes)
     contadores: dict[str, Counter] = defaultdict(Counter)
     registros = []
     hallazgos = []
     vistos = {}
 
-    for hoja in libro.sheets():
+    hojas_con_encabezado = 0
+    for hoja in hojas:
         if hoja.name == "Hoja1":
             continue  # resumen por centro de costos, no es plantilla de cargos
         fila_enc, col_grupo = _localizar_columna_ge(hoja)
         if col_grupo is None:
             continue
+        hojas_con_encabezado += 1
         col_salario = col_grupo + 1
         for r in range(fila_enc + 1, hoja.nrows):
             grupo_raw = hoja.cell_value(r, col_grupo)
@@ -444,7 +528,111 @@ def extraer_propuesta_plantilla_con_calidad():
         item["Fila de origen"],
         item["Tipo de incidencia"],
     ))
-    return mapa_canonico, contadores, registros, anomalias, hallazgos
+    resultado = (mapa_canonico, contadores, registros, anomalias, hallazgos)
+    if file_bytes is None:
+        return resultado
+    close = getattr(libro, "close", None)
+    if callable(close):
+        close()
+    release = getattr(libro, "release_resources", None)
+    if callable(release):
+        release()
+    return (*resultado, {"sheets": len(hojas), "template_sheets": hojas_con_encabezado})
+
+
+def validar_plantilla_subida(file_name: str, payload: bytes) -> dict:
+    """Valida y previsualiza un archivo subido sin escribirlo ni alterar filas."""
+    safe_name = Path(str(file_name).replace("\\", "/")).name
+    safe_name = re.sub(r"[^A-Za-z0-9._ -]", "_", safe_name)[:100] or "plantilla"
+    extension = Path(safe_name).suffix.casefold()
+    result = {
+        "filename": safe_name,
+        "sha256": hashlib.sha256(payload).hexdigest() if isinstance(payload, bytes) else "",
+        "size_bytes": len(payload) if isinstance(payload, bytes) else None,
+        "ready": False,
+        "errors": [],
+        "warnings": [],
+        "validation": [],
+        "preview": [],
+        "records": [],
+        "proposal": {},
+        "counters": {},
+        "anomalies": [],
+        "findings": [],
+        "record_count": 0,
+        "template_sheets": 0,
+    }
+    if not isinstance(payload, bytes):
+        result["errors"].append("El contenido recibido no es binario.")
+        return result
+    if extension not in {".xls", ".xlsx"}:
+        result["errors"].append("Formato no admitido: usa .xls o .xlsx sin macros.")
+        return result
+    if not payload or len(payload) > MAX_PLANTILLA_UPLOAD_BYTES:
+        result["errors"].append("El archivo está vacío o supera el límite de 15 MiB.")
+        return result
+
+    try:
+        extracted = extraer_propuesta_plantilla_con_calidad(payload, safe_name)
+        proposal, counters, records, anomalies, findings, metadata = extracted
+    except (ValueError, OSError, xlrd.XLRDError, zipfile.BadZipFile) as exc:
+        result["errors"].append(str(exc)[:300])
+        return result
+    except Exception as exc:
+        result["errors"].append(f"No se pudo leer el libro ({type(exc).__name__}).")
+        return result
+
+    template_sheets = metadata["template_sheets"]
+    missing_or_invalid = sum(
+        finding["Tipo de incidencia"] in {"Salario ausente", "Salario inválido"}
+        for finding in findings
+    )
+    duplicate_count = sum(finding["Tipo de incidencia"] == "Posible duplicado" for finding in findings)
+    result.update({
+        "proposal": dict(proposal),
+        "counters": counters,
+        "records": records,
+        "anomalies": anomalies,
+        "findings": findings,
+        "record_count": len(records),
+        "template_sheets": template_sheets,
+        "preview": records[:25],
+        "ready": bool(records) and template_sheets > 0 and missing_or_invalid == 0,
+    })
+    result["validation"] = [
+        {
+            "Control": "Hojas con encabezado G.E.",
+            "Resultado": "Correcto" if template_sheets else "ERROR",
+            "Detalle": f"Hojas de plantilla detectadas: {template_sheets}.",
+        },
+        {
+            "Control": "Cargos y salarios válidos",
+            "Resultado": "Correcto" if records and missing_or_invalid == 0 else "ERROR",
+            "Detalle": f"Filas utilizables: {len(records)}; salarios ausentes o inválidos: {missing_or_invalid}.",
+        },
+        {
+            "Control": "Posibles duplicados conservados",
+            "Resultado": "Revisar" if duplicate_count else "Correcto",
+            "Detalle": f"Posibles duplicados detectados: {duplicate_count}; no se elimina ninguna fila.",
+        },
+    ]
+    if duplicate_count:
+        result["warnings"].append(
+            f"Se detectaron {duplicate_count} posibles duplicados. Se conservan; revisa las filas de origen manualmente."
+        )
+    if anomalies:
+        result["warnings"].append(
+            f"Se detectaron discrepancias salariales en {len(anomalies)} grupos; la fuente no se corrige."
+        )
+    if not template_sheets:
+        result["errors"].append("No se encontró una fila de encabezados G.E. en las primeras 25 filas de ninguna hoja.")
+    if not records:
+        result["errors"].append("No se encontró ninguna fila utilizable con grupo romano y salario positivo.")
+    if missing_or_invalid:
+        result["errors"].append(
+            f"Hay {missing_or_invalid} filas con salario ausente o inválido; no se permite activar esta plantilla."
+        )
+    return result
 
 
 def extraer_propuesta_plantilla():
