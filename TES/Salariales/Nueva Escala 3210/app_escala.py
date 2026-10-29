@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import importlib.util
 import io
 import json
@@ -988,22 +989,46 @@ NAV = [
 
 st.markdown("""
 <style>
-:root{color-scheme:light;--ch-navy:#15324b;--ch-teal:#16866b;--ch-gold:#e6b85c;--ch-ink:#233746;--ch-muted:#536675}
-.block-container{padding-top:1.3rem;padding-bottom:3rem;max-width:1520px}
-[data-testid="stSidebar"]{border-right:1px solid #e5edf0}
-[data-testid="stSidebar"] [data-testid="stMetric"]{background:#f3f8f7;border:1px solid #e1eeeb;padding:.55rem .7rem;border-radius:12px}
-.ch-hero{background:linear-gradient(118deg,#10283c,#174b59 62%,#16866b);padding:1.45rem 1.7rem;border-radius:18px;color:white;margin-bottom:1.2rem;box-shadow:0 10px 28px rgba(21,50,75,.12)}
-.ch-hero h1{color:white;font-size:2.05rem;line-height:1.2;margin:0}.ch-hero p{color:#d9e9e8;margin:.45rem 0 0;font-size:1rem}
-.ch-kicker{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:#b8ddd4;font-weight:700}
-.ch-card{border:1px solid #e3ebef;background:#fff;border-radius:15px;padding:1rem 1.1rem;height:100%;box-shadow:0 4px 15px rgba(21,50,75,.035)}
+:root{color-scheme:light;--ch-navy:#102b4e;--ch-blue:#164b7a;--ch-cyan:#26b7d0;--ch-teal:#0f766e;--ch-ink:#1d2b3a;--ch-muted:#586b7f;--ch-border:#dfe8f0;--ch-canvas:#f4f8fc;--ch-rose:#b83748;--ch-amber:#9a5c08}
+html,body,[data-testid="stAppViewContainer"]{background:var(--ch-canvas);color:var(--ch-ink)}
+.block-container{padding-top:1.1rem;padding-bottom:3rem;max-width:1500px}
+[data-testid="stSidebar"]{background:#f8fbfe;border-right:1px solid var(--ch-border)}
+[data-testid="stSidebar"] [data-testid="stMetric"]{background:#fff;border:1px solid var(--ch-border);padding:.6rem .75rem;border-radius:13px}
+[data-testid="stMetric"]{background:#fff;border:1px solid var(--ch-border);border-radius:14px;padding:.85rem 1rem;box-shadow:0 3px 12px rgba(16,43,78,.045);min-height:96px}
+[data-testid="stMetricLabel"]{color:#52677b;font-weight:600}
+[data-testid="stMetricValue"]{color:var(--ch-navy);font-variant-numeric:tabular-nums;font-weight:750}
+.ch-hero{background:#fff;border:1px solid var(--ch-border);border-left:5px solid var(--ch-cyan);padding:1.2rem 1.55rem;border-radius:15px;color:var(--ch-navy);margin-bottom:1.15rem;box-shadow:0 4px 18px rgba(16,43,78,.045)}
+.ch-hero h1{color:var(--ch-navy);font-size:clamp(1.65rem,2.5vw,2.15rem);line-height:1.15;margin:0;font-weight:760}.ch-hero p{color:#53677b;margin:.4rem 0 0;font-size:.98rem}
+.ch-kicker{font-size:.72rem;letter-spacing:.11em;text-transform:uppercase;color:#087f8d;font-weight:750;margin-bottom:.34rem}
+.ch-card{border:1px solid var(--ch-border);background:#fff;border-radius:15px;padding:1rem 1.1rem;height:100%;box-shadow:0 4px 15px rgba(16,43,78,.035)}
 .ch-card h3{font-size:1.03rem;margin:.1rem 0 .45rem;color:var(--ch-navy)}
-.ch-card p{margin:0;color:var(--ch-muted);font-size:.91rem}
+.ch-card p{margin:0;color:var(--ch-muted);font-size:.91rem;line-height:1.5}
 .ch-muted{color:var(--ch-muted);font-size:.88rem}
-.ch-status{display:inline-block;padding:.22rem .58rem;border-radius:20px;background:#e8f5ee;color:#236645;font-size:.78rem;font-weight:700}
-:focus-visible{outline:3px solid var(--ch-gold)!important;outline-offset:3px!important;box-shadow:0 0 0 5px var(--ch-navy)!important}
-@media(max-width:640px){.block-container{padding:1rem .75rem 2rem}.ch-hero{padding:1.1rem 1rem;border-radius:14px}.ch-hero h1{font-size:clamp(1.5rem,7vw,2.05rem)}.ch-kicker{letter-spacing:.06em}.ch-card{height:auto}}
+.ch-status{display:inline-block;padding:.28rem .68rem;border-radius:999px;background:#e8f6f2;color:#176653;border:1px solid #ccebe1;font-size:.78rem;font-weight:750}
+.ch-kpi{display:flex;align-items:center;gap:.8rem;min-height:98px;padding:.9rem 1rem;background:#fff;border:1px solid var(--ch-border);border-radius:15px;box-shadow:0 3px 14px rgba(16,43,78,.045)}
+.ch-kpi-icon{width:48px;height:48px;flex:0 0 48px;border-radius:50%;display:grid;place-items:center;font-size:1.35rem;font-weight:800}
+.ch-kpi-icon.navy{background:#e7eef7;color:var(--ch-navy)}.ch-kpi-icon.blue{background:#e3f5fa;color:#067fa1}.ch-kpi-icon.teal{background:#e3f5f2;color:#137b75}.ch-kpi-icon.cyan{background:#e0f7fa;color:#0b8094}.ch-kpi-icon.rose{background:#fff0f1;color:var(--ch-rose)}
+.ch-kpi-label{font-size:.78rem;font-weight:650;color:#586b7f;margin-bottom:.18rem}.ch-kpi-value{font-size:clamp(1.35rem,1.9vw,1.75rem);line-height:1.12;color:var(--ch-navy);font-weight:800;font-variant-numeric:tabular-nums}.ch-kpi-note{font-size:.76rem;color:#62758a;margin-top:.2rem}
+.ch-section-title{font-size:1.04rem;font-weight:760;color:var(--ch-navy);margin:0 0 .65rem}
+.ch-coverage-wrap{display:flex;align-items:center;justify-content:center;padding:.7rem 0 1rem}
+.ch-donut{width:180px;height:180px;border-radius:50%;display:grid;place-items:center;position:relative}
+.ch-donut::before{content:"";position:absolute;inset:20px;background:#fff;border-radius:50%}
+.ch-donut-center{position:relative;text-align:center;color:var(--ch-navy);font-weight:800;font-size:1.6rem;line-height:1.2}.ch-donut-center small{display:block;font-size:.72rem;font-weight:600;color:#607286}
+.ch-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:.65rem 1rem;font-size:.78rem;color:#42566b}.ch-legend-item{display:flex;align-items:center;gap:.38rem}.ch-dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.ch-summary-band{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;padding:.9rem 1rem;background:linear-gradient(100deg,#e8f5fa,#f3f9fc);border:1px solid #d5eaf2;border-radius:14px;margin:.35rem 0 1.2rem;text-align:center}
+.ch-summary-band strong{display:block;color:var(--ch-navy);font-size:1.13rem;font-variant-numeric:tabular-nums}.ch-summary-band span{font-size:.78rem;color:#526a7f}
+.ch-priority{height:100%;padding:.85rem .9rem;border-radius:13px;background:#fff;border:1px solid var(--ch-border);border-top:3px solid var(--ch-cyan)}.ch-priority.warn{border-top-color:#e2a334}.ch-priority.danger{border-top-color:#d4525f}.ch-priority.good{border-top-color:#1b9d80}
+.ch-priority-head{font-size:.8rem;font-weight:750;color:#334b61;margin-bottom:.3rem}.ch-priority-value{font-size:1rem;font-weight:800;color:var(--ch-navy)}.ch-priority-note{font-size:.75rem;color:#65788a;margin-top:.18rem;line-height:1.4}
+[data-testid="stVerticalBlockBorderWrapper"]{background:#fff;border-color:var(--ch-border)!important;border-radius:15px;box-shadow:0 3px 14px rgba(16,43,78,.035)}
+[data-testid="stDataFrame"]{border:1px solid var(--ch-border);border-radius:12px;overflow:hidden}
+.stButton button,.stDownloadButton button{border-radius:10px;font-weight:650;transition:transform .15s ease,box-shadow .15s ease}
+.stButton button[kind="primary"],.stDownloadButton button[kind="primary"]{background:#123c67;border-color:#123c67;color:#fff}
+.stButton button:hover,.stDownloadButton button:hover{border-color:#1592a5;color:#0c6074;box-shadow:0 4px 12px rgba(16,43,78,.12);transform:translateY(-1px)}
+:focus-visible{outline:3px solid #087f9a!important;outline-offset:3px!important;box-shadow:0 0 0 2px #fff!important}
+@media(max-width:760px){.block-container{padding:1rem .8rem 2rem}.ch-hero{padding:1rem 1.05rem;border-radius:13px}.ch-card{height:auto}.ch-summary-band{grid-template-columns:1fr}.ch-kpi{min-height:88px}.ch-donut{width:155px;height:155px}}
+@media(max-width:640px){.block-container{padding:.85rem .65rem 1.75rem}.ch-hero h1{font-size:1.55rem}.ch-kpi{gap:.6rem;padding:.75rem}.ch-kpi-icon{width:42px;height:42px;flex-basis:42px}.ch-summary-band{margin:.25rem 0 1rem}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-hr{border-color:#e8eef1}
+hr{border-color:var(--ch-border)}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1068,12 +1093,37 @@ if st.session_state.get("firma_incidencias_calidad") != firma_incidencias:
     st.session_state.pop("editor_revision_calidad", None)
 assert detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all()
 propuesta_rows = escala_df[escala_df["Fuente del salario"] == "Plantilla Resolución 87"]
-variacion = detalle_df["Salario ajustado (CUP)"].sum() - detalle_df["Salario original (CUP)"].sum()
 
 
 def encabezado(titulo, bajada):
     st.markdown(
         f"<div class='ch-hero'><div class='ch-kicker'>{T('Capital Humano · Gestión salarial')}</div><h1>{T(titulo)}</h1><p>{T(bajada)}</p></div>",
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_kpi(label, value, note, icon, tone):
+    """Renderiza un KPI accesible; escapa todo el contenido interpolado en HTML."""
+    accessible_label = html.escape(" · ".join(part for part in (label, value, note) if part))
+    st.markdown(
+        f"""<div class="ch-kpi" role="group" aria-label="{accessible_label}">
+            <span class="ch-kpi-icon {html.escape(tone)}" aria-hidden="true">{html.escape(icon)}</span>
+            <div><div class="ch-kpi-label">{html.escape(label)}</div>
+            <div class="ch-kpi-value">{html.escape(value)}</div>
+            <div class="ch-kpi-note">{html.escape(note)}</div></div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+def mostrar_estado_card(title, value, note, tone="good"):
+    safe = [html.escape(text) for text in (title, value, note, tone)]
+    st.markdown(
+        f"""<div class="ch-priority {safe[3]}" role="group" aria-label="{safe[0]} · {safe[1]}">
+            <div class="ch-priority-head">{safe[0]}</div>
+            <div class="ch-priority-value">{safe[1]}</div>
+            <div class="ch-priority-note">{safe[2]}</div>
+        </div>""",
         unsafe_allow_html=True,
     )
 
@@ -1187,36 +1237,83 @@ def mostrar_importador_plantilla():
 
 if vista == "Panel de control":
     encabezado("Panel de Control", "Resumen ejecutivo, validaciones y accesos directos para preparar la propuesta.")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric(T("Mínimo legal de referencia"), ui.format_currency(3210, UI_LANGUAGE), T("Grupo I · CUP"))
-    c2.metric(T("Multiplicador seleccionado"), f"{factor:.2f}×", T("Rango permitido: 1–6×"))
-    c3.metric(T("Cargos encontrados"), f"{len(detalle_df):,}", f"{detalle_df['Grupo propuesto'].nunique()} {T('grupos con propuesta')}")
-    c4.metric(T("Cambio total en los cargos"), ui.format_currency(variacion, UI_LANGUAGE), T("vs. salarios fuente"))
+    c1, c2, c3, c4 = st.columns(4, gap="medium")
+    mostrar_kpi(T("Mínimo legal de referencia"), ui.format_currency(3210, UI_LANGUAGE), T("Grupo I · CUP"), "●", "navy")
+    mostrar_kpi(T("Multiplicador seleccionado"), f"{factor:.2f}×", T("Límite absoluto 6× por cargo"), "▥", "blue")
+    mostrar_kpi(T("Cargos encontrados"), f"{len(detalle_df):,}", T("Registros de la plantilla fuente"), "▤", "teal")
+    mostrar_kpi(T("Grupos con propuesta"), f"{len(propuesta)}/{len(escala_df)}", T("Los demás conservan la escala oficial"), "✓", "cyan")
 
-    left, right = st.columns([1.7, 1])
+    left, right = st.columns([1.7, 1], gap="large")
     with left:
-        st.subheader(T("Vista comparativa de la escala"))
-        grafico = propuesta_rows[[
-            "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
-        ]].set_index("Grupo").rename(columns={
-            "Escala oficial Res. 15/2026 (CUP)": T("Oficial Res. 15/2026"),
-            "Nueva propuesta (CUP)": f"{T('Propuesta')} {factor:.2f}×",
-        })
-        st.bar_chart(grafico, width="stretch", height=360)
-        st.caption(T("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII)."))
+        with st.container(border=True):
+            st.markdown(f"<div class='ch-section-title'>{T('Vista comparativa de la escala')}</div>", unsafe_allow_html=True)
+            grafico = propuesta_rows[[
+                "Grupo", "Escala oficial Res. 15/2026 (CUP)", "Nueva propuesta (CUP)"
+            ]].set_index("Grupo").rename(columns={
+                "Escala oficial Res. 15/2026 (CUP)": T("Oficial Res. 15/2026"),
+                "Nueva propuesta (CUP)": f"{T('Propuesta')} {factor:.2f}×",
+            })
+            st.bar_chart(
+                grafico, width="stretch", height=350, horizontal=True,
+                color=["#173b65", "#35b9d0"],
+            )
+            st.caption(T("Comparación de los grupos presentes en la plantilla fuente (IV–XVIII)."))
     with right:
-        st.subheader(T("Estado de revisión"))
-        fuentes_ok = base.RUTA_PLANTILLA.is_file() and base.RUTA_ESCALA_BASE.is_file()
-        st.markdown(f"<span class='ch-status'>{T('● FUENTES DISPONIBLES' if fuentes_ok else '● REVISAR FUENTES')}</span>", unsafe_allow_html=True)
-        st.write(f"**{T('Registros en plantilla')}:** {len(registros)}")
-        st.write(f"**{T('Grupos cubiertos')}:** {', '.join(sorted(propuesta, key=lambda g: base.ROMANO_A_ENTERO[g]))}")
-        st.write(f"**{T('Grupos sin propuesta')}:** {32 - len(propuesta)} {T('de 32; conservan valores oficiales.')}")
-        control_tope_ok = detalle_df["Salario ajustado (CUP)"].le(detalle_df["Tope máximo 6× (CUP)"].round(2)).all()
-        st.write(f"**{T('Control de tope')}:** {T('Correcto' if control_tope_ok else 'ERROR')}")
-        st.write(f"**{T('Discrepancias de origen')}:** {len(anomalias)} {T('grupos con valores distintos.')}")
+        with st.container(border=True):
+            st.markdown(f"<div class='ch-section-title'>{T('Cobertura de la escala')}</div>", unsafe_allow_html=True)
+            grupos_con_propuesta = len(propuesta)
+            total_grupos = len(escala_df)
+            grupos_oficiales = max(0, total_grupos - grupos_con_propuesta)
+            cobertura = grupos_con_propuesta / total_grupos if total_grupos else 0
+            giro = cobertura * 360
+            texto_accesible = T(
+                "{proposed} de {total} grupos tienen propuesta de plantilla; {official} conservan la escala oficial.",
+                proposed=grupos_con_propuesta,
+                total=total_grupos,
+                official=grupos_oficiales,
+            )
+            st.markdown(
+                f"<div class='ch-coverage-wrap'><div class='ch-donut' role='img' aria-label='{html.escape(texto_accesible)}' style='background:conic-gradient(#173b65 0deg {giro:.1f}deg,#35b9d0 {giro:.1f}deg 360deg)'>"
+                f"<div class='ch-donut-center'>{grupos_con_propuesta}/{total_grupos}<small>{T('Grupos con propuesta')}</small></div></div></div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<div class='ch-legend'><span class='ch-legend-item'><i class='ch-dot' style='background:#173b65'></i>{T('Con propuesta')}</span>"
+                f"<span class='ch-legend-item'><i class='ch-dot' style='background:#35b9d0'></i>{T('Escala oficial conservada')}</span></div>",
+                unsafe_allow_html=True,
+            )
+    st.markdown(
+        f"<div class='ch-summary-band'><div><strong>{total_grupos}</strong><span>{T('Grupos en la escala')}</span></div>"
+        f"<div><strong>{grupos_con_propuesta}</strong><span>{T('Con propuesta de plantilla')}</span></div>"
+        f"<div><strong>{grupos_oficiales}</strong><span>{T('Con escala oficial conservada')}</span></div></div>",
+        unsafe_allow_html=True,
+    )
+    st.caption(T("No se estima el gasto total de nómina: esta aplicación no dispone de un registro autorizado de plazas ocupadas y vacantes."))
+    st.divider()
+    st.subheader(T("Atención prioritaria"))
+    p1, p2, p3 = st.columns(3, gap="medium")
+    with p1:
+        integrity_title = T("Integridad de fuentes")
+        integrity_value = T("Verificada" if manifiesto.get("integrity_ok") else "Revisar")
+        mostrar_estado_card(integrity_title, integrity_value, T("Las fuentes se comparan con las huellas SHA-256 aprobadas."), "good" if manifiesto.get("integrity_ok") else "danger")
+    with p2:
+        incidencias = len(hallazgos_calidad)
+        mostrar_estado_card(
+            T("Calidad de la plantilla"),
+            T("Sin incidencias" if incidencias == 0 else "{count} por revisar", count=incidencias),
+            T("Los hallazgos no se corrigen ni eliminan automáticamente."),
+            "good" if incidencias == 0 else "warn",
+        )
+    with p3:
+        mostrar_estado_card(
+            T("Impacto total de nómina"),
+            T("No estimado"),
+            T("Requiere datos autorizados de plazas y validación de Finanzas."),
+            "warn",
+        )
     st.divider()
     st.subheader(T("Acciones rápidas"))
-    a1, a2, a3 = st.columns(3)
+    a1, a2, a3 = st.columns(3, gap="medium")
     with a1:
         st.markdown(f"<div class='ch-card'><h3>{T('📊 Revisar escala')}</h3><p>{T('Consulta los 32 grupos, salarios oficiales y propuesta ajustada.')}</p></div>", unsafe_allow_html=True)
     with a2:
