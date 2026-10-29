@@ -1,5 +1,5 @@
 # Windows requiere Python x64: Streamlit depende de PyArrow, que no publica wheels win32.
-xlrd==2.0.1
+xlrd==2.0.2
 openpyxl>=3.1.5
 fpdf2>=2.7
 pandas>=3.1.0,<4
