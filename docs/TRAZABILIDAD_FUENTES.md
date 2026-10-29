@@ -19,6 +19,15 @@ python "tools/actualizar_manifiesto_fuentes.py"
 
 Inspecciona el diff de `docs/source_manifest.json` junto al diff del archivo que cambió y registra la revisión en el pull request. La actualización del manifiesto **no valida el contenido**: simplemente acepta las huellas actuales, por lo que no debe ejecutarse para silenciar una discrepancia desconocida.
 
+## Corrección autorizada de dos salarios (2026-10-29)
+
+Tras revisar el CSV de incidencias, el usuario autorizó explícitamente sustituir dos valores singulares por el salario mayoritario de su grupo. Se modificaron únicamente las celdas salariales **J44** de `P-2  Aguas Claras` (grupo XII) y **K51** de `Plantilla Emp` (grupo XV). No se añadieron ni eliminaron filas; los estilos, hojas y nombres definidos del libro se conservaron. Los 183 cargos siguen presentes y la extracción ya no reporta incidencias de calidad.
+
+- SHA-256 de la plantilla antes del cambio: `02399d1abf33cb821829df57f146e9011488ed86a11e539c664a2114c7b8b6cc`.
+- SHA-256 de la plantilla después del cambio: `5542e23b705462738e66a82ed1aec8d60727c6d1352438266e620878ab63e473`.
+
+La revisión y corrección fue autorizada por el usuario; no es una corrección automática del proceso de calidad. El manifiesto se actualizó tras verificar el cambio.
+
 ## Alcance y límites
 
 - SHA-256 permite detectar si el archivo actual difiere de los bytes fijados en el manifiesto versionado.

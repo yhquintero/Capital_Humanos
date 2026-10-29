@@ -19,9 +19,11 @@ from pypdf import PdfReader
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_DIR = ROOT / "TES" / "Salariales" / "Nueva Escala 3210"
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(APP_DIR))
 
 import generar_escala as payroll  # noqa: E402
+from tools.verificar_paquete_exportacion import verificar_paquete  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -82,6 +84,30 @@ def test_source_files_are_present_and_template_is_auditable():
     assert all(record["hoja"] and record["fila"] > 0 and record["cargo"] for record in records)
     assert set(counters) == set(proposal)
     assert isinstance(anomalies, list)
+
+
+def test_user_authorized_majority_salary_corrections_resolve_template_findings():
+    proposal, counters, records, anomalies, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    source = payroll.xlrd.open_workbook(str(payroll.RUTA_PLANTILLA), formatting_info=True)
+    corrections = [
+        ("P-2  Aguas Claras", 44, "Jefes de Grupo de Seguridad Interna", "XII"),
+        ("Plantilla Emp", 51, "Director Comercial", "XV"),
+    ]
+    by_location = {(record["hoja"], record["fila"]): record for record in records}
+    for sheet_name, row_number, cargo, group in corrections:
+        record = by_location[(sheet_name, row_number)]
+        sheet = source.sheet_by_name(sheet_name)
+        _, group_column = payroll._localizar_columna_ge(sheet)
+        source_salary = sheet.cell_value(row_number - 1, group_column + 1)
+        assert record["cargo"] == cargo
+        assert record["grupo"] == group
+        assert source_salary == counters[group].most_common(1)[0][0]
+        assert record["salario"] == source_salary
+    assert len(records) == 183
+    assert not anomalies
+    assert not findings
+    assert proposal["XII"] == counters["XII"].most_common(1)[0][0]
+    assert proposal["XV"] == counters["XV"].most_common(1)[0][0]
 
 
 def test_source_quality_report_flags_rows_without_mutating_or_dropping_valid_duplicates(monkeypatch):
@@ -268,7 +294,7 @@ def test_export_preflight_accepts_consistent_data_and_blocks_invariant_failures(
     assert manifest_ready is False
 
 
-def test_complete_export_package_contains_outputs_parameters_and_verifiable_hashes(app_namespace):
+def test_complete_export_package_contains_outputs_parameters_and_verifiable_hashes(app_namespace, tmp_path):
     proposal, _, records, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
     detail = app_namespace["crear_tablas"](
         1.25, proposal, records, payroll.cargar_salarios_res29()
@@ -280,6 +306,9 @@ def test_complete_export_package_contains_outputs_parameters_and_verifiable_hash
     package = app_namespace["crear_paquete_completo"](
         b"xlsx-output", b"pdf-output", b"approval-draft", 1.25, detail, review, manifest
     )
+    package_path = tmp_path / "app_generated_package.zip"
+    package_path.write_bytes(package)
+    assert verificar_paquete(package_path)["ok"] is True
 
     with zipfile.ZipFile(BytesIO(package)) as archive:
         names = set(archive.namelist())
@@ -310,7 +339,15 @@ def test_complete_export_package_contains_outputs_parameters_and_verifiable_hash
 
 
 def test_quality_review_rows_have_stable_ids_and_export_manual_annotations(app_namespace):
-    _, _, _, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
+    findings = [{
+        "Tipo de incidencia": "Salario inválido",
+        "Hoja de origen": "Hoja de prueba",
+        "Fila de origen": 7,
+        "Cargo": "Técnico de prueba",
+        "Grupo": "XII",
+        "Valor detectado": "n/a",
+        "Detalle": "El valor de prueba no es numérico.",
+    }]
     first = app_namespace["crear_tabla_revision_calidad"](findings)
     second = app_namespace["crear_tabla_revision_calidad"](findings)
     assert first["ID incidencia"].tolist() == second["ID incidencia"].tolist()
@@ -331,8 +368,15 @@ def test_quality_review_rows_have_stable_ids_and_export_manual_annotations(app_n
 
 
 def test_quality_findings_zip_contains_source_locations_and_manifest(app_namespace):
-    _, _, _, _, findings = payroll.extraer_propuesta_plantilla_con_calidad()
-    assert findings
+    findings = [{
+        "Tipo de incidencia": "Salario inválido",
+        "Hoja de origen": "P-2  Aguas Claras",
+        "Fila de origen": 44,
+        "Cargo": "Cargo de prueba",
+        "Grupo": "XII",
+        "Valor detectado": "n/a",
+        "Detalle": "Hallazgo sintético para validar trazabilidad del ZIP.",
+    }]
     package = app_namespace["crear_zip_csv_con_manifiesto"](
         pd.DataFrame(findings), "incidencias.csv", payroll.verificar_manifiesto_fuentes()
     )

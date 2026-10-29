@@ -617,7 +617,8 @@ def crear_pdf(escala: pd.DataFrame, detalle: pd.DataFrame, factor: float, manifi
                                    new_x="RIGHT", new_y="TOP", max_line_height=4)
                 pdf.ln(8)
                 pdf.set_text_color(25, 39, 49)
-            pdf.set_fill_color(244, 247, 248) if ridx % 2 else pdf.set_fill_color(255, 255, 255)
+            color_fondo_fila = (244, 247, 248) if ridx % 2 else (255, 255, 255)
+            pdf.set_fill_color(*color_fondo_fila)
             pdf.set_font("DejaVu", "", font_size)
             height = 6
             for idx, (value, width) in enumerate(zip(row, widths)):

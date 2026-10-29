@@ -84,6 +84,21 @@ def test_export_page_offers_separate_approval_report():
     assert set(preflight["Resultado"]) == {"Correcto"}
 
 
+def test_export_page_never_renders_pdf_none_return_values():
+    app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
+    _assert_page_runs(app_test, "Exportaciones")
+    rendered_none = [
+        markdown.value for markdown in app_test.markdown
+        if markdown.value.strip().casefold() in {"none", "`none`"}
+    ]
+    assert rendered_none == []
+    quality_warnings = [
+        warning.value for warning in app_test.warning
+        if "incidencias de calidad" in warning.value.casefold()
+    ]
+    assert quality_warnings == []
+
+
 def test_system_page_reports_approved_source_integrity():
     app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
     _assert_page_runs(app_test, "Sistema y HTTPS")
@@ -92,34 +107,22 @@ def test_system_page_reports_approved_source_integrity():
     assert set(source_status["status"]) == {"VERIFICADA"}
 
 
-def test_quality_report_shows_traceable_source_findings():
+def test_quality_page_shows_clean_state_after_authorized_source_review():
     app_test = AppTest.from_file(str(APP), default_timeout=60).run(timeout=60)
     _assert_page_runs(app_test, "Plantilla por cargo")
-    quality_table = next(
-        frame.value for frame in app_test.dataframe
-        if "Tipo de incidencia" in frame.value.columns
+    assert any(
+        "No se detectaron incidencias" in success.value
+        for success in app_test.success
     )
-    assert set(quality_table["Tipo de incidencia"]).issubset({
-        "Posible duplicado", "Discrepancia salarial de grupo",
-        "Salario ausente", "Salario inválido", "Cargo sin descripción",
-    })
-    assert {"Hoja de origen", "Fila de origen", "Detalle"}.issubset(quality_table.columns)
-    labels = [button.label.lower() for button in app_test.get("download_button")]
-    assert any("incidencias + manifiesto" in label for label in labels)
+    assert not any(
+        "Tipo de incidencia" in frame.value.columns
+        for frame in app_test.dataframe
+    )
     review = app_test.session_state["revision_calidad_actual"]
-    assert len(review) == len(quality_table)
-    assert set(review["Estado de revisión"]) == {"Pendiente"}
-    assert {"ID incidencia", "Nota de revisión"}.issubset(review.columns)
-
-    app_test.session_state["editor_revision_calidad"] = {
-        "edited_rows": {0: {"Estado de revisión": "Revisada", "Nota de revisión": "Confirmado en el expediente."}},
-        "added_rows": [],
-        "deleted_rows": [],
-    }
-    app_test.run(timeout=60)
-    retained = app_test.session_state["revision_calidad_actual"]
-    assert retained.loc[0, "Estado de revisión"] == "Revisada"
-    assert retained.loc[0, "Nota de revisión"] == "Confirmado en el expediente."
+    assert review.empty
+    assert {"ID incidencia", "Estado de revisión", "Nota de revisión"}.issubset(review.columns)
+    labels = [button.label.lower() for button in app_test.get("download_button")]
+    assert not any("incidencias + manifiesto" in label for label in labels)
 
 
 def test_filtered_csv_is_packaged_with_source_manifest():

@@ -65,6 +65,7 @@ FUENTES_CONTROLADAS = (
     ("motor_calculo", "Código de extracción y cálculo", "TES/Salariales/Nueva Escala 3210/generar_escala.py"),
     ("interfaz_app", "Código de la aplicación y exportadores", "TES/Salariales/Nueva Escala 3210/app_escala.py"),
     ("actualizador_manifest", "Herramienta de actualización del manifiesto", "tools/actualizar_manifiesto_fuentes.py"),
+    ("verificador_paquete", "Verificador offline de paquetes de exportación", "tools/verificar_paquete_exportacion.py"),
 )
 
 GRUPOS_ROMANOS = [
