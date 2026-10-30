@@ -1,0 +1,61 @@
+{
+  "titulo": "Plantilla de cargos. Empresa Campismo Popular. P. del Río",
+  "paginas": {
+    "58622": [
+      ["Director General", "D", 1, "XVIII", 9072, 1, "XXVIII", 11709, ""],
+      ["Director Adjunto", "E", 1, "XVII", 8400, 1, "XXV", 10104, ""],
+      ["Especialista Cuadro", "E", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Insp. Sup. Serv. Turístico", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Chofer Veh. Ligero", "O", 3, "V", 4402, 2, "XIII", 5824, ""],
+      ["Secretaria", "T", 1, "XI", 5343, 1, "XVI", 6741, ""],
+      ["Asesor Jurídico", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Espec. Inform. y Comunic.", "T", 2, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Auditor Adjunto", "T", 2, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Espec. Gestión Documental", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Encarg. Activ. Generales", "S", 1, "XI", 5343, 1, "XVI", 6741, ""],
+      ["Encarg. Recep. Piz. Telefónica", "S", 1, "VI", 3918, 1, "XII", 5518, ""],
+      ["Auxiliar Gral. Servicios", "S", 1, "VII", 4153, 1, "XIII", 5824, ""],
+      ["Operario Mtto. y Serv. Técnicos", "O", 1, "VII", 4153, "-0-", "-0-", "-0-", ""],
+      ["Oficial Operat. Centro Direc.", "T", 4, "XI", 5343, 4, "XXVI", 6741, ""],
+      ["J. Dpto. Seg. Defensa", "E", 1, "XV", 7201, 1, "XXII", 8881, ""],
+      ["A.S.P.", "S", 7, "VIII", 4402, 7, "XV", 6435, ""],
+      ["Director Contable Financiero", "E", 1, "XVI", 7777, 1, "XXIV", 9645, ""],
+      ["Téc. Gestión Económica", "T", 1, "XII", 5770, 1, "XVIII", 7352, ""],
+      ["Esp. Gestión Económica", "T", 6, "XIV", 6668, 4, "XXI", 8499, ""],
+      ["Director Capital Humano", "E", 1, "XVI", 7777, 1, "XXIV", 9645, ""],
+      ["Especialista Capital Humano", "T", 3, "XIV", 6668, 2, "XXI", 8499, ""]
+    ],
+    "58623": [
+      ["Director Operaciones", "E", 1, "XVI", 7777, 1, "XXIV", 9645, ""],
+      ["Especialista Calidad", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Espec. Recreac. Animac.", "T", 1, "XIV", 6668, "-0-", "-0-", "-0-", ""],
+      ["Espec. Alim. y Bebida", "T", 1, "XIV", 6668, "-0-", "-0-", "-0-", ""],
+      ["Director Comercial", "E", 1, "XVI", 7777, 1, "XXIV", 9645, ""],
+      ["Espec. Comerc. Prod. Turíst.", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Promotor Ventas e Inf. Tur.", "S", 4, "IX", 4666, 1, "XV", 6435, ""],
+      ["Director Logístico", "E", 1, "XVI", 7777, 1, "XXIV", 9645, ""],
+      ["Espec. B en Ahorro y uso rac.", "T", 1, "XIV", 6668, 1, "XXI", 8499, ""],
+      ["Téc. Transp. Automotor", "T", 1, "XII", 5770, "-0-", "-0-", "-0-", ""],
+      ["Chofer Vehíc. Carga", "O", 2, "IX", 4666, 1, "XIV", 6180, ""],
+      ["Comprador", "T", 2, "XI", 5343, 1, "XXVI", 6741, ""],
+      ["Encargado Almacén", "S", 1, "VIII", 4402, 1, "XV", 6435, ""],
+      ["Dependiente Almacén", "S", 1, "VII", 4152, "-0-", "-0-", "-0-", ""],
+      ["Espec. Desarr. Prog. Turíst. Inv.", "T", 1, "XIV", 6668, "-0-", "-0-", "-0-", ""],
+      ["Espec. Obras Mtto.", "T", 1, "XIV", 6668, "-0-", "-0-", "-0-", ""]
+    ]
+  },
+  "notas": [
+    ["General", "Transcripción manual de las fotografías, no validación salarial. Se conservan orden, columnas, cantidades, importes y observaciones vacías. Se normalizan acentos y abreviaturas legibles; las expansiones no son denominaciones oficiales certificadas."],
+    ["Título", "Lectura interpretada: Empresa Campismo Popular. P. del Río. La segunda página no lleva título en la foto; en la recreación se identifica como continuación."],
+    ["58622 · fila 5 · D8", "La escala actual del chofer figura V aunque el salario es 4402.00; se conserva V, sin corregir a VIII."],
+    ["58622 · fila 6 · D9", "La escala actual de Secretaria se interpreta XI por la grafía y el resto de referencias; confirmar con el original."],
+    ["58622 · fila 13 · H16", "El importe propuesto de Auxiliar Gral. Servicios se lee 5824.00. Último dígito manuscrito similar a 7; requiere confirmación."],
+    ["58622 · fila 15 · G18", "La escala propuesta se lee XXVI, aunque el salario es 6741.00. Se conserva la lectura sin corregir a XVI; confirmar."],
+    ["58622 · fila 19 · G22", "Escala propuesta con corrector: se interpreta XVIII; el importe 7352.00 es legible. Confirmar la escala."],
+    ["58623 · fila 12 · G15", "Comprador: escala propuesta leída XXVI, salario 6741.00; no se ajusta automáticamente a XVI. Confirmar."],
+    ["58623 · fila 14 · E17", "Dependiente Almacén: el manuscrito parece indicar 4152.00; se conserva, aunque otros cargos con VII figuran con 4153.00."],
+    ["Celdas -0-", "Se conserva el marcador como texto; no se convierte a un salario cero ni se interpreta como celda vacía."],
+    ["Firma", "La rúbrica de 58623 se conserva únicamente en la hoja de referencia fotográfica del Excel, no se imita ni se presenta como firma del documento recreado."],
+    ["Formato", "Tablas reconstruidas con texto editable en Excel y texto vectorial seleccionable en PDF. Amarillo: Actual/Propuesta; rosa: cantidades. Las notas y los comentarios son editoriales y no pertenecen a la tabla original."]
+  ]
+}
